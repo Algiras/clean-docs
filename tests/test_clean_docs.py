@@ -27,11 +27,12 @@ def temp_dir() -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def cache_manager(temp_dir: Path) -> CacheManager:
+def cache_manager(temp_dir: Path) -> Generator[CacheManager, None, None]:
     """Create a cache manager with automatic cleanup."""
     cache = CacheManager(temp_dir / "cache", ttl_hours=1)
     yield cache
-    # Cleanup happens automatically when temp_dir is deleted
+    # Explicitly close the cache to release file handles (important on Windows)
+    cache.close()
 
 
 @pytest.fixture

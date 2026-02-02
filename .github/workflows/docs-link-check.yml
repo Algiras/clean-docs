@@ -25,13 +25,12 @@ jobs:
     
     - name: Install clean-docs
       run: |
-        pip install clean-docs
+        pip install -e .
     
     - name: Check documentation links
       run: |
         clean-docs doctor
-        clean-docs scan . --format json > link-check-results.json
-      continue-on-error: true
+        clean-docs scan . --internal-only --format json > link-check-results.json || true
     
     - name: Upload results
       uses: actions/upload-artifact@v4
@@ -39,42 +38,15 @@ jobs:
       with:
         name: link-check-results
         path: link-check-results.json
+        if-no-files-found: ignore
     
-    - name: Comment PR
-      if: github.event_name == 'pull_request' && failure()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const results = JSON.parse(fs.readFileSync('link-check-results.json', 'utf8'));
-          
-          let body = '## 🔗 Documentation Link Check Results\n\n';
-          body += `**Status:** ${results.summary.broken_links === 0 ? '✅ All links working' : '❌ Broken links found'}\n\n`;
-          body += `- Total files checked: ${results.summary.files_checked}\n`;
-          body += `- Total links: ${results.summary.total_links}\n`;
-          body += `- Working: ${results.summary.ok_links}\n`;
-          body += `- Broken: ${results.summary.broken_links}\n\n`;
-          
-          if (results.summary.broken_links > 0) {
-            body += '### Broken Links:\n\n';
-            for (const file of results.files) {
-              const broken = file.links.filter(l => l.status === 'broken');
-              if (broken.length > 0) {
-                body += `**${file.path}**\n`;
-                for (const link of broken) {
-                  body += `- Line ${link.line}: \`${link.url}\` - ${link.error}\n`;
-                  if (link.suggestion) {
-                    body += `  - 💡 ${link.suggestion}\n`;
-                  }
-                }
-                body += '\n';
-              }
-            }
-          }
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: body
-          });
+    - name: Check for broken links
+      run: |
+        if [ -f link-check-results.json ]; then
+          BROKEN=$(python -c "import json; print(json.load(open('link-check-results.json'))['summary']['broken_links'])")
+          if [ "$BROKEN" -gt 0 ]; then
+            echo "Found $BROKEN broken links"
+            cat link-check-results.json | python -m json.tool
+            exit 1
+          fi
+        fi

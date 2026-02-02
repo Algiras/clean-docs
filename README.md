@@ -1,535 +1,166 @@
 # Clean Docs
 
-> CLI tool for cleaning up documentation repositories - detect broken links, find orphaned docs, and keep your docs in sync with your code.
+> CLI tool for documentation quality - detect broken links, auto-fix issues, and integrate with CI/CD.
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Tests](https://github.com/Algiras/clean-docs/actions/workflows/tests.yml/badge.svg)](https://github.com/Algiras/clean-docs/actions/workflows/tests.yml)
 
 <p align="center">
   <img src="demo.gif" alt="clean-docs demo" width="700">
 </p>
 
-## 🎯 What is Clean Docs?
+## Features
 
-Clean Docs is a documentation maintenance tool that automatically finds and fixes common documentation issues:
+- **Link Checking** - Internal files, external URLs, GitHub repos, anchors
+- **Auto-fixing** - Missing extensions, anchor typos, case issues
+- **Smart Caching** - SQLite-based with 24h TTL, batch operations
+- **CODEOWNERS Support** - Group issues by team, create PRs per owner
+- **CI/CD Ready** - JSON/Markdown output, GitHub annotations, exit codes
 
-- 🔗 **Broken links** (internal, external, GitHub repos)
-- 📊 **Stale documentation** (outdated docs vs fresh code)
-- 💡 **Missing README sections** (Installation, Usage, Contributing)
-- 🧪 **Invalid code examples** (syntax errors in documentation)
-- 📦 **Outdated dependencies** (security & maintenance issues)
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# One-line install
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
+# Install
+pip install -e .  # or: pip install clean-docs (when published)
 
-# Check your setup
+# Check setup
 clean-docs doctor
 
-# Scan your docs
+# Scan documentation
 clean-docs scan ./docs
 
-# Fix issues automatically
+# Auto-fix issues
 clean-docs scan ./docs --fix --yes
 ```
 
-## 📊 How It Works
+## Usage
 
-### Before vs After
-
-```
-BEFORE: Documentation Chaos
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-❌ docs/api.md → 404 errors on 12 links
-❌ README.md → Missing quickstart section  
-❌ ./guide.md → Links to deleted file
-❌ examples/ → Code doesn't compile
-❌ Last updated: 8 months ago
-❌ No CI checks
-
-Running: clean-docs scan . --fix
-
-AFTER: Documentation Excellence
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ docs/api.md → All 15 links working
-✅ README.md → Complete with badges
-✅ ./guide.md → Fixed broken links
-✅ examples/ → All code validated
-✅ Freshness tracking enabled
-✅ CI/CD automated checks
-```
-
-### The Clean Docs Workflow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  YOUR DOCUMENTATION REPOSITORY                               │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  1. SCAN                                                    │
-│     clean-docs scan .                                       │
-│                                                             │
-│     → Parse all markdown files                              │
-│     → Extract links, anchors, code examples                 │
-│     → Check internal files exist                            │
-│     → Validate external URLs (with caching)                 │
-│     → Verify GitHub repos/branches                          │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  2. ANALYZE                                                 │
-│                                                             │
-│     Broken Links Found:                                     │
-│     ❌ docs/api.md:47 → ./deprecated.md (file deleted)      │
-│     ❌ README.md:23 → https://broken-url.com (404)          │
-│     ❌ guide.md:89 → #old-section (anchor renamed)          │
-│                                                             │
-│     Auto-fixable:                                           │
-│     💡 ./deprecated → ./new-location.md                     │
-│     💡 #old-section → #new-section                          │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  3. FIX (Interactive or Automatic)                          │
-│     clean-docs scan . --fix --yes                           │
-│                                                             │
-│     Iteration 1:                                            │
-│     ✅ Fixed: docs/api.md:47 → ./new-location.md            │
-│     ✅ Fixed: guide.md:89 → #new-section                    │
-│                                                             │
-│     Iteration 2: (Re-check)                                 │
-│     ✅ All internal links working                           │
-│                                                             │
-│     Manual review needed:                                   │
-│     ⚠️  README.md:23 → External 404 (manual fix)            │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  4. REPORT                                                  │
-│                                                             │
-│     Summary:                                                │
-│     ┌──────────────────────────┬──────────┐                │
-│     │ Files Checked            │ 23       │                │
-│     │ Total Links              │ 156      │                │
-│     │ Working                  │ 152 ✅   │                │
-│     │ Broken (manual fix)      │ 4 ⚠️     │                │
-│     └──────────────────────────┴──────────┘                │
-│                                                             │
-│     Score: 97% (Excellent!)                                 │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 🎬 Demo Video
-
-### Scenario: Cleaning Up a Real Project
-
-```bash
-# 1. First time setup
-$ clean-docs init --wizard
-
-╔══════════════════════════════════════════════════════════════╗
-║     Clean Docs Initialization Wizard                         ║
-╚══════════════════════════════════════════════════════════════╝
-
-Step 1: Choose a template
-┌────┬────────────────┬──────────────────────────────┐
-│ #  │ Template       │ Description                  │
-├────┼────────────────┼──────────────────────────────┤
-│ 1  │ minimal        │ Essential files only         │
-│ 2  │ full           │ Complete setup [default]     │
-│ 3  │ python-lib     │ Python library with Sphinx   │
-│ 4  │ js-package     │ JavaScript/TypeScript pkg    │
-└────┴────────────────┴──────────────────────────────┘
-Select template: 2
-
-Step 2: Project type
-┌────┬──────────────────────┐
-│ #  │ Type                 │
-├────┼──────────────────────┤
-│ 1  │ Python library       │
-│ 2  │ JavaScript package   │
-│ 3  │ Documentation site   │
-│ 4  │ Monorepo             │
-└────┴──────────────────────┘
-Select type: 1
-
-[... 7 more steps ...]
-
-✓ Created .clean-docs.yaml
-✓ Created docs/README.md
-✓ Created .github/workflows/docs-quality.yml
-✓ Updated .gitignore
-
-Next Steps:
-1. Review .clean-docs.yaml
-2. Run 'clean-docs doctor'
-3. Run 'clean-docs scan .'
-```
-
-### Real-World Usage
-
-```bash
-# Check what's broken
-$ clean-docs scan ./docs
-
-╭──────────────────────────────────╮
-│ Clean Docs Scan                  │
-│ Files: 15                        │
-│ Base: ./docs                     │
-╰──────────────────────────────────╯
-
-Checking README.md...
-Checking api.md...
-Checking guide.md...
-
-Summary:
-┏━━━━━━━━━━━━━━━┳━━━━━━━┓
-┃ Metric        ┃ Count ┃
-┡━━━━━━━━━━━━━━━╇━━━━━━━┩
-│ Files Checked │ 15    │
-│ Total Links   │ 127   │
-│ Working       │ 119 ✅│
-│ Broken        │ 8 ❌  │
-└───────────────┴───────┘
-
-✗ docs/api.md
-  Line 47: [Config Guide](./config.md)
-    Error: File not found: ./config.md
-    Hint: Did you mean ./configuration.md?
-  
-  Line 89: [Authentication](#auth-section)
-    Error: Anchor #auth-section not found
-    Hint: Did you mean #authentication?
-
-✗ README.md
-  Line 23: https://broken-example.com
-    Error: HTTP 404
-
-# Dry run to preview fixes
-$ clean-docs scan ./docs --fix --dry-run
-
-╭────────────────────────────────╮
-│ Dry Run Mode - Preview         │
-╰────────────────────────────────╯
-
-Iteration 1: 8 broken links, 6 auto-fixable
-
-Proposed fixes:
-┏━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
-┃ File         ┃ Line ┃ Change                         ┃ Description  ┃
-┡━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
-│ docs/api.md  │ 47   │ ./config.md → ./configuration.md│ Fix filename │
-│ docs/api.md  │ 89   │ #auth-section → #authentication │ Fix anchor   │
-│ ...          │ ...  │ ...                            │ ...          │
-└──────────────┴──────┴────────────────────────────────┴──────────────┘
-
-Would apply 6 fixes in 1 iteration
-
-# Apply fixes automatically
-$ clean-docs scan ./docs --fix --yes
-
-Starting iterative fix loop...
-
-Iteration 1: Found 8 broken links, 6 auto-fixable
-✓ Fixed: docs/api.md:47
-✓ Fixed: docs/api.md:89
-✓ Fixed: docs/guide.md:12
-...
-Applied 6/6 fixes
-
-Iteration 2: Re-checking...
-✓ No broken links found!
-
-Fix loop complete:
-  Iterations: 2
-  Total fixes: 6/6
-
-Summary:
-┏━━━━━━━━━━━━━━━┳━━━━━━━┓
-┃ Metric        ┃ Count ┃
-┡━━━━━━━━━━━━━━━╇━━━━━━━┩
-│ Files Checked │ 15    │
-│ Total Links   │ 127   │
-│ Working       │ 125 ✅│
-│ Broken        │ 2 ⚠️  │
-└───────────────┴───────┘
-
-Note: 2 external links still broken (require manual fix)
-```
-
-## 📦 Installation
-
-### One-Line Install (Recommended)
-
-```bash
-# Quick install
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
-
-# With semantic analysis support
-WITH_SEMANTIC=1 curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
-```
-
-### Pip Install
-
-```bash
-# Basic install (link checking only)
-pip install clean-docs
-
-# With all features
-pip install clean-docs[semantic]
-```
-
-## 🎯 Features
-
-### Core Features (Always Available)
-
-| Feature | What It Does | Example |
-|---------|--------------|---------|
-| **Link Checking** | Validates all link types | Internal, external, GitHub, anchors |
-| **Iterative Fixing** | Auto-fixes in loop until done | Missing `.md`, anchor typos, case issues |
-| **Smart Caching** | Caches results for 24h | Skip re-checking working links |
-| **GitHub Integration** | Checks repo/branch/file existence | `github.com/user/repo/blob/main/file.md` |
-| **CI/CD Ready** | JSON output, exit codes | Perfect for GitHub Actions |
-
-### Link Types Supported
-
-```
-Internal Links          External Links           GitHub Links
-─────────────────       ─────────────────        ─────────────────
-./file.md               https://example.com      github.com/user/repo
-../docs/guide.md        http://api.site.com      github.com/user/repo/tree/branch
-/guide.md (absolute)    https://bit.ly/xxx       github.com/user/repo/blob/branch/path
-#section-anchor         ftp://... (skipped)      github.com/user/repo/issues/123
-[ref][link]            mailto:... (skipped)
-```
-
-### Fixing Capabilities
-
-```
-✅ AUTO-FIXABLE (No human needed)
-   • ./file → ./file.md (missing extension)
-   • #secton → #section (anchor typo)
-   • ./File.md → ./file.md (case sensitivity)
-   
-⚠️  MANUAL REVIEW NEEDED
-   • External URL returns 404
-   • GitHub repo doesn't exist
-   • File deleted with no redirect
-```
-
-## 🏃 Usage
-
-### 1. Doctor - Check Your Setup
-
-```bash
-# Check required dependencies
-clean-docs doctor
-
-# Check everything including optional features
-clean-docs doctor --all
-```
-
-```
-╭──────────── Doctor Report ─────────────╮
-│ All checks passed! ✅                   │
-╰─────────────────────────────────────────╯
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Check                    ┃ Status  ┃ Details                        ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ Python Version           │ ✅ Pass │ Python 3.12.1                  │
-│ GitHub CLI               │ ✅ Pass │ gh version 2.40.0              │
-│ GITHUB_TOKEN             │ ✅ Pass │ Set                            │
-│ Cache Directory          │ ✅ Pass │ /tmp/clean-docs-cache          │
-│ Semantic Analysis (Opt)  │ ✅ Pass │ sentence-transformers v2.3.1   │
-│ Copilot CLI (Opt)        │ ✅ Pass │ Available                      │
-└──────────────────────────┴─────────┴────────────────────────────────┘
-```
-
-### 2. Scan - Find Issues
+### Scan for Issues
 
 ```bash
 # Basic scan
 clean-docs scan ./docs
 
-# With all options
-clean-docs scan ./docs \
-  --verbose \              # Show all links
-  --format json \          # JSON output
-  --config ./custom.yaml   # Custom config
+# Fast mode (internal links only)
+clean-docs scan ./docs --internal-only
 
-# Performance options
+# With options
 clean-docs scan ./docs \
-  --internal-only \        # Skip external links (fast mode)
-  --timeout 30 \           # Custom timeout
-  --retry 3 \              # Retry flaky links
-  --fail-fast              # Stop on first error
-
-# CI/CD integration
-clean-docs scan ./docs \
-  --format markdown \      # Markdown report
-  --output report.md \     # Write to file
-  --github-annotations     # GitHub Actions annotations
+  --verbose \
+  --timeout 30 \
+  --retry 3 \
+  --fail-fast
 ```
 
-### 3. Fix - Repair Issues
+### Output Formats
 
 ```bash
-# Preview what would be fixed
+# Console (default)
+clean-docs scan ./docs
+
+# JSON
+clean-docs scan ./docs --format json
+
+# Markdown report
+clean-docs scan ./docs --format markdown --output report.md
+
+# GitHub Actions annotations
+clean-docs scan ./docs --github-annotations
+```
+
+### Fix Issues
+
+```bash
+# Preview fixes
 clean-docs scan ./docs --fix --dry-run
 
-# Interactive mode (prompts for confirmation)
+# Interactive (prompts for each fix)
 clean-docs scan ./docs --fix
 
-# Auto-fix everything
+# Auto-fix all
 clean-docs scan ./docs --fix --yes
 ```
 
-### 4. Init - Setup New Project
+### CODEOWNERS Integration
+
+For monorepos, group issues by team and create separate PRs:
 
 ```bash
-# Interactive wizard (9 steps)
-clean-docs init --wizard
-
-# Quick mode - just config file
-clean-docs init --quick
-
-# Specific template
-clean-docs init --template python-lib
-```
-
-### 5. Fix PRs - Create PRs by CODEOWNERS (Monorepo)
-
-For large repositories with CODEOWNERS, create separate PRs for each team:
-
-```bash
-# Preview what PRs would be created
-clean-docs fix-prs . --codeowners CODEOWNERS --dry-run
-
-# Create PRs for all owner groups
-clean-docs fix-prs . --codeowners CODEOWNERS
-
-# Only fix for a specific team
-clean-docs fix-prs . --only-owner @myteam/docs
-
-# Skip certain owners
-clean-docs fix-prs . --skip-owner @bot-account
-```
-
-**Features:**
-- Groups broken links by CODEOWNERS teams
-- Creates separate branches and PRs per team
-- Auto-detects base branch (main/master)
-- Adds team members as reviewers
-- Only applies safe, conservative fixes
-
-### 6. Owners - Check File Ownership
-
-```bash
-# Check who owns a file
+# View ownership
 clean-docs owners ./docs/api.md
 
-# Check ownership in a directory
-clean-docs owners ./framework/
+# Scan grouped by owner
+clean-docs scan . --group-by-owner
+
+# Create PRs per team
+clean-docs fix-prs . --codeowners CODEOWNERS
+
+# Only for specific team
+clean-docs fix-prs . --only-owner @myteam/docs
 ```
 
-**Wizard creates:**
-- `.clean-docs.yaml` (configuration)
-- `docs/` structure (if requested)
-- `.github/workflows/` (CI/CD)
-- `.pre-commit-config.yaml` (git hooks)
-- `README.md` template
+### Cache Management
 
-## ⚙️ Configuration
+```bash
+# View stats
+clean-docs cache --stats
 
-### `.clean-docs.yaml` Example
+# Show broken links
+clean-docs cache --broken
+
+# Clear expired
+clean-docs cache --cleanup
+
+# Clear all
+clean-docs cache --clear
+```
+
+## Configuration
+
+Create `.clean-docs.yaml`:
 
 ```yaml
 links:
-  timeout: 10                    # HTTP timeout (seconds)
-  concurrency: 20                # Parallel checks
-  ignore_patterns:               # Skip these URLs
+  timeout: 10           # HTTP timeout (seconds)
+  concurrency: 20       # Parallel checks
+  ignore_patterns:
     - "localhost"
     - "127.0.0.1"
     - "example.com"
-    - "*.local"
 
 cache:
-  ttl_hours: 24                  # Cache expiration
-  max_size_mb: 100              # Max cache size
-  # dir: ~/.cache/clean-docs    # Custom location
-
-output:
-  show_progress: true           # Progress bars
-  colors: auto                  # auto/always/never
+  ttl_hours: 24
 ```
 
-## 🔄 CI/CD Integration
+## CI/CD
 
 ### GitHub Actions
 
 ```yaml
-name: Documentation Quality
+name: Docs Check
 
 on: [push, pull_request]
 
 jobs:
-  docs:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       
-      - name: Install clean-docs
-        run: pip install clean-docs
-      
-      - name: Check Documentation Links
+      - name: Install and check
         run: |
-          # With GitHub annotations (shows errors inline in PR)
+          pip install -e .
           clean-docs scan . --github-annotations --internal-only
       
-      - name: Generate Report
+      - name: Report on failure
         if: failure()
         run: |
-          clean-docs scan . --format markdown --output report.md --internal-only || true
-          cat report.md >> $GITHUB_STEP_SUMMARY
-```
-
-### Advanced CI Example (with CODEOWNERS)
-
-```yaml
-name: Docs Link Check by Owner
-
-on:
-  schedule:
-    - cron: '0 6 * * 1'  # Weekly on Monday
-  workflow_dispatch:
-
-jobs:
-  check-and-fix:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Check by CODEOWNERS
-        run: |
-          pip install clean-docs
-          clean-docs scan . --group-by-owner --format markdown
-      
-      - name: Create Fix PRs (dry-run)
-        run: |
-          clean-docs fix-prs . --dry-run
+          clean-docs scan . --format markdown >> $GITHUB_STEP_SUMMARY || true
 ```
 
 ### Exit Codes
@@ -537,105 +168,43 @@ jobs:
 | Code | Meaning |
 |------|---------|
 | `0` | All checks passed |
-| `1` | Issues found (broken links, etc.) |
+| `1` | Broken links found |
 
-## 🧠 Advanced Features (Optional)
+## Link Types Supported
 
-### Semantic Analysis
+| Type | Example |
+|------|---------|
+| Internal | `./file.md`, `../docs/guide.md` |
+| Anchors | `#section`, `./file.md#anchor` |
+| External | `https://example.com` |
+| GitHub | `github.com/user/repo/blob/main/file.md` |
 
-When installed with `pip install clean-docs[semantic]`:
+## Auto-Fix Capabilities
 
-```bash
-# Find docs without related code
-clean-docs semantic --orphaned ./docs
+| Fixable | Example |
+|---------|---------|
+| Missing extension | `./file` → `./file.md` |
+| Anchor normalization | `#My-Section` → `#my-section` |
+| Case sensitivity | `./File.md` → `./file.md` |
 
-# Find code without docs
-clean-docs semantic --missing-docs ./src
-```
+**Manual review needed:**
+- External 404s
+- Deleted files with no redirect
+- Semantic anchor changes
 
-## 🗂️ Cache Location
-
-By default, cache is stored in **system temp directory**:
-
-- **Linux/macOS**: `/tmp/clean-docs-cache/` or `/var/folders/.../T/clean-docs-cache/`
-- **Windows**: `%TEMP%\clean-docs-cache\`
-
-**Why temp?**
-- Auto-cleaned by OS
-- No pollution of project dirs
-- Works across projects
-- Can customize in config
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**"clean-docs: command not found"**
-```bash
-# Add to PATH
-export PATH="$HOME/.local/bin:$PATH"
-# Or reinstall
-pip install --force-reinstall clean-docs
-```
-
-**"Cannot connect to host"**
-```yaml
-# In .clean-docs.yaml
-links:
-  timeout: 30  # Increase from default 10s
-```
-
-**Rate limits on GitHub**
-```bash
-# Authenticate
-gh auth login
-# Or set token
-export GITHUB_TOKEN=your_token
-```
-
-## 📊 Success Metrics
-
-After using Clean Docs, you should see:
-
-```
-Before:                  After:
-━━━━━━━━━━━━━━━━         ━━━━━━━━━━━━━━━━
-156 links                156 links
-23 broken ❌             0 broken ✅
-0% automated             95% automated
-No tracking              Full tracking
-No CI                    CI integrated
-
-Time to check: 5min     Time to check: 10sec
-Time to fix: 2hrs       Time to fix: 0 (auto)
-```
-
-## 🤝 Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file.
-
-## 🎉 Get Started Now
+## Development
 
 ```bash
-# Install
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
+# Install dev dependencies
+pip install -e ".[dev]"
 
-# Setup
-clean-docs init --wizard
+# Run tests
+pytest tests/ -v
 
-# Check
-clean-docs doctor
-
-# Clean
-clean-docs scan . --fix --yes
-
-# Celebrate! 🎊
+# Run specific test
+pytest tests/test_clean_docs.py::TestCache -v
 ```
 
----
+## License
 
-**Clean docs = Happy developers** 🧹✨
+MIT License - see [LICENSE](LICENSE).

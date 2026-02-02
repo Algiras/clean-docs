@@ -1,0 +1,18 @@
+# Clean Docs Configuration
+# Generated automatically - customize as needed
+
+links:
+  timeout: 10                    # HTTP request timeout in seconds
+  concurrency: 20                # Concurrent link checks
+  ignore_patterns:               # URL patterns to skip
+    - "localhost"
+    - "127.0.0.1"
+    - "example.com"
+
+cache:
+  ttl_hours: 24                  # How long to cache link status
+  max_size_mb: 100               # Max cache size
+
+output:
+  show_progress: true            # Show progress bars
+  colors: auto                   # auto/always/never

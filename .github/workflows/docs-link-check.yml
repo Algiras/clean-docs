@@ -1,0 +1,80 @@
+name: Docs Link Check
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'docs/**'
+      - '*.md'
+
+jobs:
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install clean-docs
+      run: |
+        pip install clean-docs
+    
+    - name: Check documentation links
+      run: |
+        clean-docs doctor
+        clean-docs scan . --format json > link-check-results.json
+      continue-on-error: true
+    
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: link-check-results
+        path: link-check-results.json
+    
+    - name: Comment PR
+      if: github.event_name == 'pull_request' && failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const results = JSON.parse(fs.readFileSync('link-check-results.json', 'utf8'));
+          
+          let body = '## 🔗 Documentation Link Check Results\n\n';
+          body += `**Status:** ${results.summary.broken_links === 0 ? '✅ All links working' : '❌ Broken links found'}\n\n`;
+          body += `- Total files checked: ${results.summary.files_checked}\n`;
+          body += `- Total links: ${results.summary.total_links}\n`;
+          body += `- Working: ${results.summary.ok_links}\n`;
+          body += `- Broken: ${results.summary.broken_links}\n\n`;
+          
+          if (results.summary.broken_links > 0) {
+            body += '### Broken Links:\n\n';
+            for (const file of results.files) {
+              const broken = file.links.filter(l => l.status === 'broken');
+              if (broken.length > 0) {
+                body += `**${file.path}**\n`;
+                for (const link of broken) {
+                  body += `- Line ${link.line}: \`${link.url}\` - ${link.error}\n`;
+                  if (link.suggestion) {
+                    body += `  - 💡 ${link.suggestion}\n`;
+                  }
+                }
+                body += '\n';
+              }
+            }
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });

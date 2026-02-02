@@ -4,12 +4,14 @@ This module is optional. If sentence-transformers is not installed,
 semantic analysis features will be disabled gracefully.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from rich.console import Console
 from rich.table import Table
@@ -21,8 +23,12 @@ try:
     SEMANTIC_AVAILABLE = True
 except ImportError:
     SEMANTIC_AVAILABLE = False
-    np = None
+    np = None  # type: ignore
     SentenceTransformer = None
+
+# For type hints only - won't fail at runtime
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @dataclass
@@ -31,7 +37,7 @@ class EmbeddingEntry:
     path: Path
     content_hash: str
     chunks: List[str]
-    embeddings: np.ndarray
+    embeddings: Any  # np.ndarray when numpy is available
     file_type: str  # 'doc', 'code', 'example'
 
 
@@ -274,7 +280,7 @@ class EmbeddingManager:
         # Limit chunk size
         return [c[:2000] for c in chunks if len(c) > 50]
     
-    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
+    def compute_similarity(self, embedding1: Any, embedding2: Any) -> float:
         """Compute cosine similarity between two embeddings."""
         dot = np.dot(embedding1, embedding2)
         norm1 = np.linalg.norm(embedding1)
@@ -287,7 +293,7 @@ class EmbeddingManager:
     
     def find_similar(
         self,
-        query_embedding: np.ndarray,
+        query_embedding: Any,
         candidates: List[EmbeddingEntry],
         top_k: int = 5,
         threshold: float = 0.5,

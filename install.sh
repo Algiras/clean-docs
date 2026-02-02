@@ -120,6 +120,58 @@ check_pip() {
     fi
 }
 
+# Check optional prerequisites
+check_prerequisites() {
+    log_info "Checking optional prerequisites..."
+    echo ""
+    
+    PREREQ_WARNINGS=0
+    
+    # Check git
+    if command_exists git; then
+        GIT_VERSION=$(git --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        log_success "git $GIT_VERSION"
+    else
+        log_warning "git not found - needed for fix-prs command"
+        PREREQ_WARNINGS=$((PREREQ_WARNINGS + 1))
+    fi
+    
+    # Check GitHub CLI
+    if command_exists gh; then
+        GH_VERSION=$(gh --version | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        log_success "GitHub CLI $GH_VERSION"
+        
+        # Check if authenticated
+        if gh auth status >/dev/null 2>&1; then
+            log_success "GitHub CLI authenticated"
+        else
+            log_warning "GitHub CLI not authenticated - run 'gh auth login'"
+            PREREQ_WARNINGS=$((PREREQ_WARNINGS + 1))
+        fi
+    else
+        log_warning "GitHub CLI (gh) not found - needed for GitHub link checking and fix-prs"
+        log_info "  Install: https://cli.github.com/"
+        PREREQ_WARNINGS=$((PREREQ_WARNINGS + 1))
+    fi
+    
+    # Check curl (for external link checking)
+    if command_exists curl; then
+        log_success "curl available"
+    else
+        log_warning "curl not found - external link checking may be limited"
+        PREREQ_WARNINGS=$((PREREQ_WARNINGS + 1))
+    fi
+    
+    echo ""
+    if [ $PREREQ_WARNINGS -gt 0 ]; then
+        log_warning "$PREREQ_WARNINGS optional prerequisite(s) missing"
+        log_info "clean-docs will work but some features may be limited"
+    else
+        log_success "All prerequisites available"
+    fi
+    echo ""
+}
+
 # Install clean-docs
 install_package() {
     log_info "Installing $PACKAGE_NAME..."
@@ -270,6 +322,7 @@ main() {
     
     check_python
     check_pip
+    check_prerequisites
     install_package
     verify_installation
     

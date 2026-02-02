@@ -332,11 +332,13 @@ class TestConfig:
 
     def test_get_cache_dir_default(self):
         """Test default cache directory is in temp."""
+        import tempfile
         config = Config()
         cache_dir = config.get_cache_dir()
 
-        # Should be in system temp
-        assert "tmp" in str(cache_dir).lower() or "temp" in str(cache_dir).lower()
+        # Should be in system temp directory
+        expected_temp = Path(tempfile.gettempdir())
+        assert cache_dir.parent == expected_temp
         assert "clean-docs-cache" in str(cache_dir)
 
     def test_get_cache_dir_custom(self):

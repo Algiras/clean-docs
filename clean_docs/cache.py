@@ -56,7 +56,7 @@ class CacheManager:
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT status, status_code, error, timestamp FROM link_status WHERE url = ?",
+            "SELECT status, status_code, error, timestamp, response_time FROM link_status WHERE url = ?",
             (url,)
         )
         row = cursor.fetchone()
@@ -65,18 +65,21 @@ class CacheManager:
         if row is None:
             return None
         
-        status, status_code, error, timestamp = row
+        status, status_code, error, timestamp, response_time = row
         
         # Check if expired
         if time.time() - timestamp > self.ttl_seconds:
             return None
         
-        return {
+        result = {
             "status": status,
             "status_code": status_code,
             "error": error,
             "timestamp": timestamp,
         }
+        if response_time is not None:
+            result["response_time"] = response_time
+        return result
     
     def set_link_status(
         self, 

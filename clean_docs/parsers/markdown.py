@@ -92,7 +92,8 @@ class MarkdownParser:
                     
                     elif child.type == "image":
                         src = child.attrGet("src") or ""
-                        alt = child.attrGet("alt") or ""
+                        # Alt text is stored in the token content for images
+                        alt = child.content or ""
                         line_num = token.map[0] + 1 if token.map else 0
                         
                         links.append(Link(

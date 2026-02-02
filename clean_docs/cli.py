@@ -18,6 +18,7 @@ from clean_docs.cache import CacheManager
 from clean_docs.config import Config, DEFAULT_CONFIG_CONTENT
 from clean_docs.doctor import Doctor
 from clean_docs.fixer import LinkFixer
+from clean_docs.init_wizard import InitWizard
 from clean_docs.link_checker import LinkChecker, LinkResult, LinkStatus
 from clean_docs.parsers.markdown import MarkdownParser
 from clean_docs.semantic import EmbeddingManager, SemanticAnalyzer
@@ -47,6 +48,36 @@ def doctor(
     
     if not all_passed:
         raise typer.Exit(code=1)
+
+
+@app.command()
+def init(
+    path: Path = typer.Option(Path("."), "--path", "-p", help="Project path"),
+    use_wizard: bool = typer.Option(True, "--wizard/--quick", "-w/-q", help="Use interactive wizard or quick mode"),
+    template: str = typer.Option("full", "--template", "-t", help="Template to use (minimal, full, python-lib, js-package)"),
+):
+    """Initialize Clean Docs for a project with interactive wizard."""
+    target_path = path.resolve()
+    
+    if use_wizard:
+        # Use interactive wizard
+        init_wizard = InitWizard(console, target_path)
+        success = init_wizard.run()
+        
+        if not success:
+            raise typer.Exit(code=1)
+    else:
+        # Quick mode - just create basic config
+        config_path = target_path / ".clean-docs.yaml"
+        
+        if config_path.exists():
+            console.print(f"[yellow]Config already exists: {config_path}[/yellow]")
+            raise typer.Exit(code=1)
+        
+        config = Config()
+        config.save(config_path)
+        console.print(f"[green]Created config: {config_path}[/green]")
+        console.print("[dim]Run 'clean-docs init --wizard' for full setup[/dim]")
 
 
 @app.command()

@@ -148,10 +148,63 @@ class MarkdownParser:
         return sorted(markdown_files)
     
     def get_anchor_id(self, heading_text: str) -> str:
-        """Convert heading text to anchor ID."""
-        # GitHub-style anchors: lowercase, spaces to hyphens, remove special chars
+        """Convert heading text to anchor ID (GitHub-style)."""
+        # GitHub-style anchors: lowercase, spaces to hyphens, remove most special chars
         anchor = heading_text.lower()
         anchor = re.sub(r'[^\w\s-]', '', anchor)
         anchor = re.sub(r'\s+', '-', anchor)
         anchor = anchor.strip('-')
         return anchor
+    
+    def get_anchor_variants(self, heading_text: str) -> Set[str]:
+        """Generate multiple anchor ID variants to handle different markdown renderers.
+        
+        Different tools generate anchors differently:
+        - GitHub: removes most punctuation, replaces spaces with hyphens
+        - GitLab: similar but may keep some chars
+        - Docusaurus/MDX: may use different rules
+        - Some keep parentheses as-is, some remove them
+        """
+        variants = set()
+        text = heading_text.lower()
+        
+        # Variant 1: Standard GitHub style (strict - remove all non-word chars)
+        # Note: hyphen must be at end of character class to be literal
+        v1 = re.sub(r'[^\w\s-]', '', text)
+        v1 = re.sub(r'\s+', '-', v1).strip('-')
+        variants.add(v1)
+        
+        # Variant 2: Keep periods and some punctuation (e.g., "a.k.a." -> "aka")
+        v2 = text.replace('.', '').replace(',', '')
+        v2 = re.sub(r'[^\w\s-]', '', v2)
+        v2 = re.sub(r'\s+', '-', v2).strip('-')
+        variants.add(v2)
+        
+        # Variant 3: Replace parentheses content style (e.g., "(a.k.a.)" -> "-aka-")
+        v3 = re.sub(r'\(([^)]+)\)', r'-\1-', text)
+        v3 = v3.replace('.', '').replace(',', '')
+        v3 = re.sub(r'[^\w\s-]', '', v3)
+        v3 = re.sub(r'\s+', '-', v3)
+        v3 = re.sub(r'-+', '-', v3).strip('-')
+        variants.add(v3)
+        
+        # Variant 4: Keep parentheses as part of slug (hyphen at end of class)
+        v4 = text.replace('(', '').replace(')', '')
+        v4 = re.sub(r'[^\w\s.-]', '', v4)
+        v4 = re.sub(r'\s+', '-', v4)
+        v4 = v4.replace('.', '').strip('-')
+        variants.add(v4)
+        
+        # Variant 5: e.g. -> eg style conversion
+        v5 = text.replace('e.g.', 'eg').replace('i.e.', 'ie').replace('a.k.a.', 'aka')
+        v5 = re.sub(r'[^\w\s-]', '', v5)
+        v5 = re.sub(r'\s+', '-', v5).strip('-')
+        variants.add(v5)
+        
+        # Variant 6: Numbered duplicates (heading-1, heading-2 for duplicate headings)
+        # We'll add these during anchor checking, not here
+        
+        # Remove empty strings
+        variants.discard('')
+        
+        return variants

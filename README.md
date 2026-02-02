@@ -5,6 +5,10 @@
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+<p align="center">
+  <img src="demo.gif" alt="clean-docs demo" width="700">
+</p>
+
 ## 🎯 What is Clean Docs?
 
 Clean Docs is a documentation maintenance tool that automatically finds and fixes common documentation issues:
@@ -360,6 +364,19 @@ clean-docs scan ./docs \
   --verbose \              # Show all links
   --format json \          # JSON output
   --config ./custom.yaml   # Custom config
+
+# Performance options
+clean-docs scan ./docs \
+  --internal-only \        # Skip external links (fast mode)
+  --timeout 30 \           # Custom timeout
+  --retry 3 \              # Retry flaky links
+  --fail-fast              # Stop on first error
+
+# CI/CD integration
+clean-docs scan ./docs \
+  --format markdown \      # Markdown report
+  --output report.md \     # Write to file
+  --github-annotations     # GitHub Actions annotations
 ```
 
 ### 3. Fix - Repair Issues
@@ -386,6 +403,41 @@ clean-docs init --quick
 
 # Specific template
 clean-docs init --template python-lib
+```
+
+### 5. Fix PRs - Create PRs by CODEOWNERS (Monorepo)
+
+For large repositories with CODEOWNERS, create separate PRs for each team:
+
+```bash
+# Preview what PRs would be created
+clean-docs fix-prs . --codeowners CODEOWNERS --dry-run
+
+# Create PRs for all owner groups
+clean-docs fix-prs . --codeowners CODEOWNERS
+
+# Only fix for a specific team
+clean-docs fix-prs . --only-owner @myteam/docs
+
+# Skip certain owners
+clean-docs fix-prs . --skip-owner @bot-account
+```
+
+**Features:**
+- Groups broken links by CODEOWNERS teams
+- Creates separate branches and PRs per team
+- Auto-detects base branch (main/master)
+- Adds team members as reviewers
+- Only applies safe, conservative fixes
+
+### 6. Owners - Check File Ownership
+
+```bash
+# Check who owns a file
+clean-docs owners ./docs/api.md
+
+# Check ownership in a directory
+clean-docs owners ./framework/
 ```
 
 **Wizard creates:**
@@ -434,11 +486,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Check Documentation
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install clean-docs
+        run: pip install clean-docs
+      
+      - name: Check Documentation Links
+        run: |
+          # With GitHub annotations (shows errors inline in PR)
+          clean-docs scan . --github-annotations --internal-only
+      
+      - name: Generate Report
+        if: failure()
+        run: |
+          clean-docs scan . --format markdown --output report.md --internal-only || true
+          cat report.md >> $GITHUB_STEP_SUMMARY
+```
+
+### Advanced CI Example (with CODEOWNERS)
+
+```yaml
+name: Docs Link Check by Owner
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday
+  workflow_dispatch:
+
+jobs:
+  check-and-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check by CODEOWNERS
         run: |
           pip install clean-docs
-          clean-docs scan . --format json
-          clean-docs analyze . --report markdown
+          clean-docs scan . --group-by-owner --format markdown
+      
+      - name: Create Fix PRs (dry-run)
+        run: |
+          clean-docs fix-prs . --dry-run
 ```
 
 ### Exit Codes

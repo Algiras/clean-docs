@@ -46,3 +46,6 @@ htmlcov/
 # Temp files
 *.log
 *.tmp
+
+# VHS tape files (keep GIF, ignore source)
+*.tape

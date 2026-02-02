@@ -265,6 +265,72 @@ class TestCache:
         assert result2["status_code"] == 404
         assert result2["error"] == "Not found"
 
+    def test_cache_batch_get(self, cache_manager: CacheManager):
+        """Test batch retrieval of cache entries."""
+        # Add multiple entries
+        urls = [f"https://example{i}.com" for i in range(5)]
+        for url in urls:
+            cache_manager.set_link_status(url, "ok", 200)
+        
+        # Batch get
+        results = cache_manager.get_link_statuses_batch(urls)
+        
+        assert len(results) == 5
+        for url in urls:
+            assert url in results
+            assert results[url]["status"] == "ok"
+
+    def test_cache_batch_set(self, cache_manager: CacheManager):
+        """Test batch setting of cache entries."""
+        entries = [
+            ("https://a.com", "ok", 200, None, 0.1),
+            ("https://b.com", "broken", 404, "Not found", 0.2),
+            ("https://c.com", "ok", 301, None, 0.3),
+        ]
+        
+        cache_manager.set_link_statuses_batch(entries)
+        
+        # Verify all were set
+        for url, status, code, error, _ in entries:
+            result = cache_manager.get_link_status(url)
+            assert result is not None
+            assert result["status"] == status
+            assert result["status_code"] == code
+
+    def test_cache_cleanup_expired(self, temp_dir: Path):
+        """Test cleanup of expired entries."""
+        # Very short TTL
+        cache = CacheManager(temp_dir, ttl_hours=0.0001)
+        
+        # Add entry
+        cache.set_link_status("https://old.com", "ok", 200)
+        
+        # Wait for expiry
+        import time
+        time.sleep(0.5)
+        
+        # Cleanup should remove the entry
+        deleted = cache.cleanup_expired()
+        assert deleted >= 1
+        
+        # Entry should be gone
+        assert cache.get_link_status("https://old.com") is None
+
+    def test_cache_get_broken_links(self, cache_manager: CacheManager):
+        """Test retrieval of broken links."""
+        # Add mix of ok and broken
+        cache_manager.set_link_status("https://good.com", "ok", 200)
+        cache_manager.set_link_status("https://bad1.com", "broken", 404, error="Not found")
+        cache_manager.set_link_status("https://bad2.com", "broken", 500, error="Server error")
+        
+        broken = cache_manager.get_broken_links()
+        
+        assert len(broken) == 2
+        urls = [b["url"] for b in broken]
+        assert "https://bad1.com" in urls
+        assert "https://bad2.com" in urls
+        assert "https://good.com" not in urls
+
 
 # Configuration Tests
 
@@ -539,12 +605,17 @@ class TestLinkFixer:
         assert "extension" in fix.description.lower()
 
     def test_analyze_anchor_typo(self, temp_dir: Path):
-        """Test detecting anchor typos with suggestions."""
+        """Test detecting anchor typos with suggestions.
+        
+        Note: Semantic changes (sectin -> section) are NOT auto-fixable
+        because they could be incorrect suggestions. Only safe changes
+        like case or hyphen normalization are auto-fixed.
+        """
         from rich.console import Console
 
         fixer = LinkFixer(temp_dir, Console())
 
-        # Link with typo
+        # Link with typo - semantic change, NOT auto-fixable
         link = Link(text="test", url="#sectin", line=5, column=0)
         result = LinkResult(
             link=link,
@@ -563,9 +634,37 @@ class TestLinkFixer:
         fix = fixer._analyze_broken_link(doc, result)
 
         assert fix is not None
-        assert fix.auto_fixable is True
+        assert fix.auto_fixable is False  # NOT auto-fixable (semantic change)
         assert fix.suggested_url == "#section"
-        assert "anchor" in fix.description.lower()
+        assert "manual review" in fix.description.lower()
+    
+    def test_analyze_anchor_safe_change(self, temp_dir: Path):
+        """Test that safe anchor changes (case, hyphens) ARE auto-fixable."""
+        from rich.console import Console
+
+        fixer = LinkFixer(temp_dir, Console())
+
+        # Link with double-hyphen - safe change, IS auto-fixable  
+        link = Link(text="test", url="#data-cleanup--retention", line=5, column=0)
+        result = LinkResult(
+            link=link,
+            status=LinkStatus.BROKEN,
+            error_message="Anchor not found",
+            suggestion="Did you mean #data-cleanup-retention?",
+        )
+        doc = MarkdownDocument(
+            path=temp_dir / "doc.md",
+            content="[test](#data-cleanup--retention)",
+            links=[link],
+            headings=[(1, "Data Cleanup & Retention", 10)],
+            references={},
+        )
+
+        fix = fixer._analyze_broken_link(doc, result)
+
+        assert fix is not None
+        assert fix.auto_fixable is True  # IS auto-fixable (hyphen normalization)
+        assert fix.suggested_url == "#data-cleanup-retention"
 
     def test_apply_single_fix(self, temp_dir: Path):
         """Test applying a single fix to a file."""
@@ -731,6 +830,141 @@ class TestCleanup:
         cache2 = CacheManager(temp_dir)
         result = cache2.get_link_status("https://test.com")
         assert result is not None
+
+
+# CODEOWNERS Tests
+
+
+class TestCodeOwners:
+    """Test CODEOWNERS parsing and matching."""
+
+    def test_parse_simple_codeowners(self, temp_dir: Path):
+        """Test parsing a simple CODEOWNERS file."""
+        from clean_docs.codeowners import CodeOwners
+        
+        codeowners_content = """
+# This is a comment
+* @default-owner
+
+/docs/ @docs-team
+/src/*.py @python-team
+"""
+        codeowners_path = temp_dir / "CODEOWNERS"
+        codeowners_path.write_text(codeowners_content)
+        
+        owners = CodeOwners.parse_file(codeowners_path)
+        
+        assert owners.default_owners == ["@default-owner"]
+        assert len(owners.rules) == 2
+
+    def test_get_owners_for_file(self, temp_dir: Path):
+        """Test getting owners for a specific file."""
+        from clean_docs.codeowners import CodeOwners
+        
+        codeowners_content = """
+* @default
+/docs/ @docs-team
+/docs/api/ @api-team
+"""
+        codeowners_path = temp_dir / "CODEOWNERS"
+        codeowners_path.write_text(codeowners_content)
+        
+        owners = CodeOwners.parse_file(codeowners_path)
+        
+        # Last matching rule wins
+        assert owners.get_owners("docs/api/reference.md") == ["@api-team"]
+        assert owners.get_owners("docs/guide.md") == ["@docs-team"]
+        assert owners.get_owners("src/main.py") == ["@default"]
+
+    def test_get_owner_key(self, temp_dir: Path):
+        """Test owner key generation for grouping."""
+        from clean_docs.codeowners import CodeOwners
+        
+        codeowners_content = """
+/docs/ @team-a @team-b
+/src/ @team-c
+"""
+        codeowners_path = temp_dir / "CODEOWNERS"
+        codeowners_path.write_text(codeowners_content)
+        
+        owners = CodeOwners.parse_file(codeowners_path)
+        
+        # Keys should be sorted and comma-separated
+        key = owners.get_owner_key("docs/readme.md")
+        assert "@team-a" in key
+        assert "@team-b" in key
+
+    def test_group_files_by_owner(self, temp_dir: Path):
+        """Test grouping files by owner."""
+        from clean_docs.codeowners import CodeOwners
+        
+        codeowners_content = """
+/docs/ @docs-team
+/src/ @dev-team
+"""
+        codeowners_path = temp_dir / "CODEOWNERS"
+        codeowners_path.write_text(codeowners_content)
+        
+        owners = CodeOwners.parse_file(codeowners_path)
+        
+        files = ["docs/a.md", "docs/b.md", "src/c.py", "other.txt"]
+        groups = owners.group_files_by_owner(files)
+        
+        assert len(groups) >= 2  # At least docs-team and dev-team groups
+
+    def test_find_codeowners_locations(self, temp_dir: Path):
+        """Test finding CODEOWNERS in standard locations."""
+        from clean_docs.codeowners import CodeOwners
+        
+        # Create .github/CODEOWNERS
+        github_dir = temp_dir / ".github"
+        github_dir.mkdir()
+        (github_dir / "CODEOWNERS").write_text("* @default")
+        
+        owners = CodeOwners.find_and_parse(temp_dir)
+        
+        assert owners is not None
+        assert owners.default_owners == ["@default"]
+
+
+# Safe Anchor Fix Tests
+
+
+class TestSafeAnchorFix:
+    """Test the safe anchor fix detection."""
+
+    def test_case_change_is_safe(self, temp_dir: Path):
+        """Test that case changes are considered safe."""
+        from rich.console import Console
+        from clean_docs.fixer import LinkFixer
+        
+        fixer = LinkFixer(temp_dir, Console())
+        
+        # Case-only changes should be safe
+        assert fixer._is_safe_anchor_fix("Section", "section") is True
+        assert fixer._is_safe_anchor_fix("UPPER", "upper") is True
+
+    def test_double_hyphen_is_safe(self, temp_dir: Path):
+        """Test that double-hyphen normalization is safe."""
+        from rich.console import Console
+        from clean_docs.fixer import LinkFixer
+        
+        fixer = LinkFixer(temp_dir, Console())
+        
+        # Double hyphen to single should be safe
+        assert fixer._is_safe_anchor_fix("foo--bar", "foo-bar") is True
+        assert fixer._is_safe_anchor_fix("a---b", "a-b") is True
+
+    def test_semantic_change_is_not_safe(self, temp_dir: Path):
+        """Test that semantic changes are NOT considered safe."""
+        from rich.console import Console
+        from clean_docs.fixer import LinkFixer
+        
+        fixer = LinkFixer(temp_dir, Console())
+        
+        # Different words should NOT be safe
+        assert fixer._is_safe_anchor_fix("introduction", "getting-started") is False
+        assert fixer._is_safe_anchor_fix("api-reference", "endpoints") is False
 
 
 if __name__ == "__main__":

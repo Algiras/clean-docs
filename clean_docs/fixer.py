@@ -149,26 +149,40 @@ class LinkFixer:
                         auto_fixable=True,
                     )
         
-        # Handle anchor suggestions
+        # Handle anchor suggestions - ONLY auto-fix safe transformations
         if link_result.suggestion and "Did you mean" in link_result.suggestion:
             # Extract suggested anchor from the hint
             match = re.search(r'Did you mean #([^?]+)\?', link_result.suggestion)
             if match:
                 suggested_anchor = match.group(1)
-                if "#" in url:
-                    base_url = url.split("#")[0]
-                    new_url = f"{base_url}#{suggested_anchor}"
-                else:
-                    new_url = f"#{suggested_anchor}"
+                original_anchor = url.split("#")[1] if "#" in url else url.lstrip("#")
                 
-                return Fix(
-                    file_path=doc.path,
-                    line=link.line,
-                    original_url=url,
-                    suggested_url=new_url,
-                    description=f"Fix anchor: #{url.split('#')[1] if '#' in url else ''} → #{suggested_anchor}",
-                    auto_fixable=True,
-                )
+                # Only auto-fix if it's a safe transformation
+                if self._is_safe_anchor_fix(original_anchor, suggested_anchor):
+                    if "#" in url:
+                        base_url = url.split("#")[0]
+                        new_url = f"{base_url}#{suggested_anchor}"
+                    else:
+                        new_url = f"#{suggested_anchor}"
+                    
+                    return Fix(
+                        file_path=doc.path,
+                        line=link.line,
+                        original_url=url,
+                        suggested_url=new_url,
+                        description=f"Fix anchor: #{original_anchor} → #{suggested_anchor}",
+                        auto_fixable=True,
+                    )
+                else:
+                    # Not safe to auto-fix - mark for manual review
+                    return Fix(
+                        file_path=doc.path,
+                        line=link.line,
+                        original_url=url,
+                        suggested_url=f"#{suggested_anchor}",
+                        description=f"Anchor not found (suggestion: #{suggested_anchor}) - needs manual review",
+                        auto_fixable=False,
+                    )
         
         # Try case-insensitive match for internal files
         if not url.startswith("http") and not url.startswith("#"):
@@ -178,18 +192,21 @@ class LinkFixer:
                 search_dir = resolved.parent if resolved.parent.exists() else doc.path.parent
                 target_name = resolved.name.lower()
                 
-                for file in search_dir.iterdir():
-                    if file.is_file() and file.name.lower() == target_name:
-                        # Calculate relative path
-                        rel_path = self._make_relative(doc.path.parent, file)
-                        return Fix(
-                            file_path=doc.path,
-                            line=link.line,
-                            original_url=url,
-                            suggested_url=rel_path,
-                            description=f"Fix case: {resolved.name} → {file.name}",
-                            auto_fixable=True,
-                        )
+                try:
+                    for file in search_dir.iterdir():
+                        if file.is_file() and file.name.lower() == target_name:
+                            # Calculate relative path
+                            rel_path = self._make_relative(doc.path.parent, file)
+                            return Fix(
+                                file_path=doc.path,
+                                line=link.line,
+                                original_url=url,
+                                suggested_url=rel_path,
+                                description=f"Fix case: {resolved.name} → {file.name}",
+                                auto_fixable=True,
+                            )
+                except (PermissionError, OSError):
+                    pass
         
         # External/GitHub links need manual review
         if url.startswith("http"):
@@ -203,6 +220,44 @@ class LinkFixer:
             )
         
         return None
+    
+    def _is_safe_anchor_fix(self, original: str, suggested: str) -> bool:
+        """Check if an anchor fix is safe to auto-apply.
+        
+        Safe fixes are:
+        1. Case changes only: #Context -> #context
+        2. Double hyphen to single: #foo--bar -> #foo-bar  
+        3. Trailing/leading hyphen removal: #-foo- -> #foo
+        4. The normalized forms are identical
+        """
+        # Normalize both anchors for comparison
+        def normalize(s: str) -> str:
+            s = s.lower()
+            # Collapse multiple hyphens
+            s = re.sub(r'-+', '-', s)
+            # Remove leading/trailing hyphens
+            s = s.strip('-')
+            return s
+        
+        orig_norm = normalize(original)
+        sugg_norm = normalize(suggested)
+        
+        # If normalized versions are identical, it's safe
+        if orig_norm == sugg_norm:
+            return True
+        
+        # Check if it's just case difference (without normalization)
+        if original.lower() == suggested.lower():
+            return True
+        
+        # Check if it's just hyphen normalization
+        orig_dehyphen = original.lower().replace('-', '')
+        sugg_dehyphen = suggested.lower().replace('-', '')
+        if orig_dehyphen == sugg_dehyphen:
+            return True
+        
+        # Otherwise, not safe - the anchors are semantically different
+        return False
     
     def _resolve_path(self, doc_path: Path, url: str) -> Path:
         """Resolve a URL to an absolute path."""

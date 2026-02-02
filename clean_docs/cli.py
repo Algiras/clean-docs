@@ -23,7 +23,7 @@ from clean_docs.fixer import LinkFixer
 from clean_docs.init_wizard import InitWizard
 from clean_docs.link_checker import LinkChecker, LinkResult, LinkStatus
 from clean_docs.parsers.markdown import MarkdownParser
-from clean_docs.semantic import EmbeddingManager, SemanticAnalyzer
+from clean_docs.semantic import EmbeddingManager, SemanticAnalyzer, SEMANTIC_AVAILABLE
 from clean_docs.codeowners import CodeOwners
 from clean_docs.pr_pipeline import PRPipeline
 
@@ -928,6 +928,177 @@ def fix_prs(
     
     # Exit with error if any PRs failed
     if any(r.get("error") for r in results.values()):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def semantic(
+    path: Path = typer.Argument(..., help="Path to documentation/code directory"),
+    docs_dir: Optional[Path] = typer.Option(None, "--docs", "-d", help="Documentation directory (default: docs/, *.md)"),
+    code_dir: Optional[Path] = typer.Option(None, "--code", "-c", help="Code directory (default: src/, lib/, *.py)"),
+    orphaned: bool = typer.Option(False, "--orphaned", help="Find docs without related code"),
+    missing: bool = typer.Option(False, "--missing", help="Find code without documentation"),
+    threshold: float = typer.Option(0.5, "--threshold", "-t", help="Similarity threshold (0.0-1.0)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed results"),
+):
+    """Semantic analysis - find orphaned docs and missing documentation.
+    
+    Requires: pip install clean-docs[semantic]
+    
+    Examples:
+        clean-docs semantic . --orphaned      # Find docs with no related code
+        clean-docs semantic . --missing       # Find code with no docs
+        clean-docs semantic . --orphaned --missing  # Both
+    """
+    if not SEMANTIC_AVAILABLE:
+        console.print("[red]Semantic analysis requires additional dependencies.[/red]")
+        console.print("Install with: [cyan]pip install 'clean-docs[semantic]'[/cyan]")
+        raise typer.Exit(code=1)
+    
+    if not orphaned and not missing:
+        console.print("[yellow]Specify --orphaned and/or --missing[/yellow]")
+        console.print("Example: clean-docs semantic . --orphaned --missing")
+        raise typer.Exit(code=1)
+    
+    base_path = path.resolve()
+    config = Config.load(None)
+    
+    # Determine directories
+    if docs_dir:
+        docs_path = docs_dir.resolve()
+    else:
+        # Auto-detect docs directory
+        for candidate in ["docs", "doc", "documentation"]:
+            if (base_path / candidate).is_dir():
+                docs_path = base_path / candidate
+                break
+        else:
+            docs_path = base_path
+    
+    if code_dir:
+        code_path = code_dir.resolve()
+    else:
+        # Auto-detect code directory
+        for candidate in ["src", "lib", "app", base_path.name]:
+            if (base_path / candidate).is_dir():
+                code_path = base_path / candidate
+                break
+        else:
+            code_path = base_path
+    
+    console.print(Panel(
+        f"[bold]Semantic Analysis[/bold]\n"
+        f"Docs: {docs_path}\n"
+        f"Code: {code_path}\n"
+        f"Threshold: {threshold}",
+        title="Clean Docs",
+    ))
+    
+    # Initialize embedding manager
+    cache_dir = config.get_cache_dir() / "semantic"
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Loading embedding model...", total=None)
+        
+        embedding_manager = EmbeddingManager(cache_dir, console=console)
+        analyzer = SemanticAnalyzer(embedding_manager, console=console)
+        
+        # Index documents
+        progress.update(task, description="Indexing documentation...")
+        doc_files = list(docs_path.rglob("*.md"))
+        for doc_file in doc_files:
+            analyzer.index_document(doc_file)
+        
+        # Index code
+        progress.update(task, description="Indexing code...")
+        code_extensions = ["*.py", "*.js", "*.ts", "*.go", "*.java", "*.rs"]
+        for ext in code_extensions:
+            for code_file in code_path.rglob(ext):
+                if "node_modules" not in str(code_file) and ".git" not in str(code_file):
+                    analyzer.index_code(code_file)
+        
+        progress.update(task, description="Analyzing relationships...")
+    
+    # Results
+    console.print()
+    
+    if orphaned:
+        console.print("[bold]Orphaned Documentation[/bold] (docs with no related code):")
+        orphaned_results = analyzer.find_orphaned_docs(threshold=threshold)
+        
+        if not orphaned_results:
+            console.print("  [green]No orphaned docs found![/green]")
+        else:
+            table = Table(show_header=True)
+            table.add_column("Document", style="cyan")
+            table.add_column("Best Match", style="dim")
+            table.add_column("Similarity", justify="right")
+            
+            for doc_entry, matches in orphaned_results:
+                try:
+                    rel_path = doc_entry.path.relative_to(base_path)
+                except ValueError:
+                    rel_path = doc_entry.path
+                
+                if matches:
+                    best_match = matches[0]
+                    try:
+                        match_path = best_match[0].path.relative_to(base_path)
+                    except ValueError:
+                        match_path = best_match[0].path
+                    table.add_row(str(rel_path), str(match_path), f"{best_match[1]:.2f}")
+                else:
+                    table.add_row(str(rel_path), "-", "-")
+            
+            console.print(table)
+            console.print(f"\n[yellow]Found {len(orphaned_results)} orphaned doc(s)[/yellow]")
+        
+        console.print()
+    
+    if missing:
+        console.print("[bold]Missing Documentation[/bold] (code with no related docs):")
+        missing_results = analyzer.find_missing_docs(threshold=threshold)
+        
+        if not missing_results:
+            console.print("  [green]All code has documentation![/green]")
+        else:
+            table = Table(show_header=True)
+            table.add_column("Code File", style="cyan")
+            table.add_column("Best Match", style="dim")
+            table.add_column("Similarity", justify="right")
+            
+            for code_entry, matches in missing_results:
+                try:
+                    rel_path = code_entry.path.relative_to(base_path)
+                except ValueError:
+                    rel_path = code_entry.path
+                
+                if matches:
+                    best_match = matches[0]
+                    try:
+                        match_path = best_match[0].path.relative_to(base_path)
+                    except ValueError:
+                        match_path = best_match[0].path
+                    table.add_row(str(rel_path), str(match_path), f"{best_match[1]:.2f}")
+                else:
+                    table.add_row(str(rel_path), "-", "-")
+            
+            console.print(table)
+            console.print(f"\n[yellow]Found {len(missing_results)} code file(s) without docs[/yellow]")
+    
+    # Summary
+    console.print()
+    total_issues = 0
+    if orphaned:
+        total_issues += len(analyzer.find_orphaned_docs(threshold=threshold))
+    if missing:
+        total_issues += len(analyzer.find_missing_docs(threshold=threshold))
+    
+    if total_issues > 0:
         raise typer.Exit(code=1)
 
 

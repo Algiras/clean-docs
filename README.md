@@ -100,6 +100,27 @@ clean-docs fix-prs . --codeowners CODEOWNERS
 clean-docs fix-prs . --only-owner @myteam/docs
 ```
 
+### Semantic Analysis (AI-Powered)
+
+Find orphaned docs and missing documentation using embeddings:
+
+```bash
+# Install with semantic support
+pip install 'clean-docs[semantic]'
+
+# Find docs with no related code
+clean-docs semantic . --orphaned
+
+# Find code without documentation  
+clean-docs semantic . --missing
+
+# Both with custom threshold
+clean-docs semantic . --orphaned --missing --threshold 0.6
+
+# Specify directories
+clean-docs semantic . --docs ./docs --code ./src
+```
+
 ### Cache Management
 
 ```bash

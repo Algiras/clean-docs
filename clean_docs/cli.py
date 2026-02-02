@@ -1010,16 +1010,28 @@ def semantic(
         # Index documents
         progress.update(task, description="Indexing documentation...")
         doc_files = list(docs_path.rglob("*.md"))
-        for doc_file in doc_files:
-            analyzer.index_document(doc_file)
+        # Filter out node_modules and .git
+        doc_files = [f for f in doc_files if "node_modules" not in str(f) and ".git" not in str(f)]
+        analyzer.index_documents(doc_files)
         
         # Index code
         progress.update(task, description="Indexing code...")
+        code_files = []
         code_extensions = ["*.py", "*.js", "*.ts", "*.go", "*.java", "*.rs"]
+        # Directories to skip
+        skip_dirs = {"node_modules", ".git", "__pycache__", ".venv", "venv", "env", 
+                     ".tox", ".pytest_cache", "dist", "build", ".eggs", "site-packages",
+                     ".mypy_cache", ".ruff_cache"}
         for ext in code_extensions:
             for code_file in code_path.rglob(ext):
-                if "node_modules" not in str(code_file) and ".git" not in str(code_file):
-                    analyzer.index_code(code_file)
+                # Skip if any part of path is in skip_dirs
+                if not any(part in skip_dirs for part in code_file.parts):
+                    code_files.append(code_file)
+        
+        if len(code_files) > 500:
+            console.print(f"[yellow]Warning: Found {len(code_files)} code files. Consider using --code to specify a subdirectory.[/yellow]")
+        
+        analyzer.index_code(code_files)
         
         progress.update(task, description="Analyzing relationships...")
     

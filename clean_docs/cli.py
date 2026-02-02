@@ -14,6 +14,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from rich.text import Text
 
+from clean_docs import __version__
 from clean_docs.cache import CacheManager
 from clean_docs.config import Config, DEFAULT_CONFIG_CONTENT
 from clean_docs.doctor import Doctor
@@ -23,12 +24,36 @@ from clean_docs.link_checker import LinkChecker, LinkResult, LinkStatus
 from clean_docs.parsers.markdown import MarkdownParser
 from clean_docs.semantic import EmbeddingManager, SemanticAnalyzer
 
+
+def version_callback(value: bool):
+    """Print version and exit."""
+    if value:
+        console.print(f"clean-docs version {__version__}")
+        raise typer.Exit()
+
+
 app = typer.Typer(
     name="clean-docs",
-    help="Clean up documentation - check links, find outdated content",
+    help="Clean up documentation - check links, validate examples, maintain quality",
     rich_markup_mode="rich",
+    invoke_without_command=True,
 )
 console = Console()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, 
+        "--version", 
+        "-v", 
+        callback=version_callback, 
+        is_eager=True,
+        help="Show version and exit."
+    ),
+):
+    """Clean Docs - Documentation maintenance tool."""
+    pass
 
 
 class OutputFormat(str, Enum):

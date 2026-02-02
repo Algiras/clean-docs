@@ -341,13 +341,15 @@ class TestConfig:
         assert cache_dir.parent == expected_temp
         assert "clean-docs-cache" in str(cache_dir)
 
-    def test_get_cache_dir_custom(self):
+    def test_get_cache_dir_custom(self, temp_dir: Path):
         """Test custom cache directory."""
+        custom_path = temp_dir / "custom-cache"
         config = Config()
-        config.cache.dir = "/custom/path"
+        config.cache.dir = str(custom_path)
 
         cache_dir = config.get_cache_dir()
-        assert str(cache_dir) == "/custom/path"
+        assert cache_dir == custom_path
+        assert cache_dir.exists()  # Directory should be created
 
 
 # Link Checker Tests

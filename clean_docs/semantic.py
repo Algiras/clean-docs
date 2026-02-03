@@ -473,3 +473,51 @@ class SemanticAnalyzer:
         
         self.console.print(f"\n[bold yellow]Code Missing Documentation ({len(missing)} files):[/bold yellow]")
         self.console.print(table)
+
+    def find_similar_code(
+        self,
+        snippet_code: str,
+        top_k: int = 5,
+        threshold: float = 0.3,
+    ) -> List[Tuple[EmbeddingEntry, float]]:
+        """Find source code similar to a documentation snippet.
+
+        This is useful for fuzzy matching when exact symbol matching fails.
+
+        Args:
+            snippet_code: The code snippet from documentation
+            top_k: Number of top matches to return
+            threshold: Minimum similarity threshold
+
+        Returns:
+            List of (code_entry, similarity_score) tuples sorted by similarity
+        """
+        if not self.code_entries:
+            return []
+
+        # Generate embedding for the snippet
+        snippet_embedding = self.embeddings.model.encode(
+            [snippet_code],
+            show_progress_bar=False,
+        )[0]
+
+        return self.embeddings.find_similar(
+            snippet_embedding,
+            self.code_entries,
+            top_k=top_k,
+            threshold=threshold,
+        )
+
+    def embed_snippet(self, snippet_code: str) -> Any:
+        """Generate embedding for a code snippet.
+
+        Args:
+            snippet_code: The code snippet to embed
+
+        Returns:
+            Embedding array for the snippet
+        """
+        return self.embeddings.model.encode(
+            [snippet_code],
+            show_progress_bar=False,
+        )[0]

@@ -28,6 +28,13 @@ semantic = [
     "sentence-transformers>=2.3.0",
     "torch>=2.0.0",
 ]
+snippets = [
+    "tree-sitter>=0.23.0",
+    "tree-sitter-language-pack>=0.2.0",
+]
+vectors = [
+    "sqlite-vec>=0.1.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",

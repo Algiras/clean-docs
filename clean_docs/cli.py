@@ -22,10 +22,12 @@ from clean_docs.doctor import Doctor
 from clean_docs.fixer import LinkFixer
 from clean_docs.init_wizard import InitWizard
 from clean_docs.link_checker import LinkChecker, LinkResult, LinkStatus
-from clean_docs.parsers.markdown import MarkdownParser
+from clean_docs.parsers.markdown import MarkdownParser, CodeBlock
 from clean_docs.semantic import EmbeddingManager, SemanticAnalyzer, SEMANTIC_AVAILABLE
 from clean_docs.codeowners import CodeOwners
 from clean_docs.pr_pipeline import PRPipeline
+from clean_docs.symbol_indexer import SymbolIndexer, SNIPPETS_AVAILABLE
+from clean_docs.snippet_validator import SnippetValidator, ValidationStatus, SnippetReport
 
 
 def version_callback(value: bool):
@@ -1162,6 +1164,348 @@ def owners(
             console.print(f"  [cyan]{owner}[/cyan]")
     else:
         console.print(f"[yellow]No owners defined for[/yellow] {rel_path}")
+
+
+@app.command("validate-snippets")
+def validate_snippets(
+    path: Path = typer.Argument(..., help="Path to documentation directory or file", exists=True),
+    code_dir: Optional[Path] = typer.Option(None, "--code-dir", "-c", help="Source code directory (default: auto-detect)"),
+    fix: bool = typer.Option(False, "--fix", help="Auto-update outdated snippets"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be fixed without making changes"),
+    threshold: float = typer.Option(0.8, "--threshold", "-t", help="Similarity threshold for matching (0.0-1.0)"),
+    format: OutputFormat = typer.Option(OutputFormat.CONSOLE, "--format", "-f", help="Output format (console, json, markdown)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed results"),
+    exclude: Optional[List[str]] = typer.Option(None, "--exclude", "-e", help="Glob patterns to exclude (can be used multiple times)"),
+):
+    """Validate code snippets in documentation against actual source code.
+
+    Checks that code examples in markdown files match the actual implementation.
+    Can auto-fix outdated snippets with --fix.
+
+    Requires: pip install clean-docs[snippets]
+
+    Examples:
+        clean-docs validate-snippets ./docs --code-dir ./src
+        clean-docs validate-snippets README.md --fix --dry-run
+        clean-docs validate-snippets . --threshold 0.7 --format json
+    """
+    if not SNIPPETS_AVAILABLE:
+        console.print("[red]Snippet validation requires additional dependencies.[/red]")
+        console.print("Install with: [cyan]pip install 'clean-docs[snippets]'[/cyan]")
+        raise typer.Exit(code=1)
+
+    base_path = path.resolve()
+
+    # Auto-detect code directory if not specified
+    if code_dir:
+        source_path = code_dir.resolve()
+    else:
+        # Look for common code directories
+        for candidate in ["src", "lib", "app", "main", "source"]:
+            if (base_path / candidate).is_dir():
+                source_path = base_path / candidate
+                break
+        else:
+            # Use base path for both
+            source_path = base_path
+
+    console.print(Panel(
+        f"[bold]Code Snippet Validation[/bold]\n"
+        f"Docs: {base_path}\n"
+        f"Code: {source_path}\n"
+        f"Threshold: {threshold}",
+        title="Clean Docs",
+        border_style="blue",
+    ))
+
+    # Find markdown files
+    parser = MarkdownParser()
+
+    if path.is_file():
+        markdown_files = [path]
+    else:
+        markdown_files = parser.find_all_markdown_files(base_path)
+
+    # Apply exclude patterns
+    if exclude:
+        original_count = len(markdown_files)
+        markdown_files = _filter_files_by_exclude(markdown_files, list(exclude), base_path)
+        if verbose:
+            console.print(f"[dim]Excluded {original_count - len(markdown_files)} files[/dim]")
+
+    if not markdown_files:
+        console.print(f"[yellow]No markdown files found in {path}[/yellow]")
+        raise typer.Exit(code=0)
+
+    # Initialize symbol indexer and index source code
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Indexing source code...", total=None)
+
+        indexer = SymbolIndexer()
+        files_indexed = indexer.index_directory(source_path)
+
+        progress.update(task, description=f"Indexed {files_indexed} source files")
+
+    if files_indexed == 0:
+        console.print(f"[yellow]No source files found in {source_path}[/yellow]")
+        console.print("[dim]Use --code-dir to specify the source code directory[/dim]")
+        raise typer.Exit(code=0)
+
+    # Initialize validator
+    validator = SnippetValidator(indexer, similarity_threshold=threshold)
+
+    # Validate all documents
+    all_reports: List[SnippetReport] = []
+    total_snippets = 0
+    total_valid = 0
+    total_outdated = 0
+    total_not_found = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Validating snippets...", total=len(markdown_files))
+
+        for md_file in markdown_files:
+            progress.update(task, description=f"Checking {md_file.name}...")
+
+            try:
+                doc = parser.parse_file(md_file)
+                if doc.code_blocks:
+                    report = validator.validate_document(md_file, doc.code_blocks)
+                    all_reports.append(report)
+
+                    total_snippets += report.total_snippets
+                    total_valid += report.valid_count
+                    total_outdated += report.outdated_count
+                    total_not_found += report.not_found_count
+            except Exception as e:
+                if verbose:
+                    console.print(f"[red]Error processing {md_file}: {e}[/red]")
+
+            progress.advance(task)
+
+    # Output results
+    if format == OutputFormat.JSON:
+        output = _get_snippet_json_output(all_reports, base_path)
+        console.print(output)
+    elif format == OutputFormat.MARKDOWN:
+        output = _get_snippet_markdown_output(all_reports, base_path)
+        print(output)
+    else:
+        _print_snippet_console_results(all_reports, base_path, verbose)
+
+    # Print summary
+    console.print()
+    summary_table = Table(show_header=True, header_style="bold magenta")
+    summary_table.add_column("Metric", style="cyan")
+    summary_table.add_column("Count", style="bold")
+
+    summary_table.add_row("Total Snippets", str(total_snippets))
+    summary_table.add_row("Valid", f"[green]{total_valid}[/green]")
+    summary_table.add_row("Outdated", f"[yellow]{total_outdated}[/yellow]" if total_outdated > 0 else "0")
+    summary_table.add_row("Not Found", f"[dim]{total_not_found}[/dim]")
+
+    console.print("[bold]Summary:[/bold]")
+    console.print(summary_table)
+
+    # Apply fixes if requested
+    if fix and total_outdated > 0:
+        if dry_run:
+            console.print("\n[bold yellow]Dry Run - Would fix these snippets:[/bold yellow]")
+            for report in all_reports:
+                for result in report.results:
+                    if result.status == ValidationStatus.OUTDATED:
+                        try:
+                            rel_path = report.doc_path.relative_to(base_path)
+                        except ValueError:
+                            rel_path = report.doc_path
+                        console.print(f"  [yellow]•[/yellow] {rel_path}:{result.snippet.line}")
+        else:
+            console.print("\n[bold cyan]Applying fixes...[/bold cyan]")
+            total_fixed = 0
+            for report in all_reports:
+                if report.outdated_count > 0:
+                    fixes, _ = validator.fix_document(report.doc_path, report, dry_run=False)
+                    total_fixed += fixes
+                    if fixes > 0:
+                        try:
+                            rel_path = report.doc_path.relative_to(base_path)
+                        except ValueError:
+                            rel_path = report.doc_path
+                        console.print(f"  [green]✓[/green] Fixed {fixes} snippet(s) in {rel_path}")
+
+            console.print(f"\n[green]Fixed {total_fixed} snippet(s)[/green]")
+
+    # Final status
+    if total_outdated == 0:
+        console.print(Panel.fit(
+            "[green bold]All code snippets are valid![/green bold]",
+            border_style="green"
+        ))
+    else:
+        if fix and not dry_run:
+            console.print(Panel.fit(
+                f"[green bold]Fixed {total_outdated} outdated snippet(s)[/green bold]",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel.fit(
+                f"[yellow bold]Found {total_outdated} outdated snippet(s)[/yellow bold]\n"
+                f"[dim]Run with --fix to update them[/dim]",
+                border_style="yellow"
+            ))
+            raise typer.Exit(code=1)
+
+
+def _print_snippet_console_results(reports: List[SnippetReport], base_path: Path, verbose: bool):
+    """Print snippet validation results in console format."""
+    for report in reports:
+        if report.outdated_count == 0 and not verbose:
+            continue
+
+        try:
+            rel_path = report.doc_path.relative_to(base_path)
+        except ValueError:
+            rel_path = report.doc_path
+
+        has_issues = report.outdated_count > 0
+
+        if has_issues:
+            console.print(f"\n[bold red]✗[/bold red] {rel_path}")
+        elif verbose:
+            console.print(f"\n[bold green]✓[/bold green] {rel_path}")
+
+        for result in report.results:
+            if result.status == ValidationStatus.VALID:
+                if verbose:
+                    console.print(f"  [green]✓[/green] Line {result.snippet.line} ({result.snippet.language}) - Valid")
+            elif result.status == ValidationStatus.OUTDATED:
+                console.print(f"  [yellow]✗[/yellow] Line {result.snippet.line} ({result.snippet.language})")
+                if result.source_match:
+                    console.print(f"    [dim]Source: {result.source_match.file_path}:{result.source_match.start_line}[/dim]")
+                console.print(f"    [dim]Similarity: {result.similarity:.1%}[/dim]")
+                if result.diff and verbose:
+                    console.print(f"    [dim]Diff:[/dim]")
+                    for line in result.diff.split('\n')[:10]:
+                        if line.startswith('+'):
+                            console.print(f"      [green]{line}[/green]")
+                        elif line.startswith('-'):
+                            console.print(f"      [red]{line}[/red]")
+                        else:
+                            console.print(f"      {line}")
+            elif result.status == ValidationStatus.NOT_FOUND and verbose:
+                console.print(f"  [dim]⚠[/dim] Line {result.snippet.line} ({result.snippet.language}) - No source match")
+
+
+def _get_snippet_json_output(reports: List[SnippetReport], base_path: Path) -> str:
+    """Get snippet validation results as JSON string."""
+    output = {
+        "summary": {
+            "files_checked": len(reports),
+            "total_snippets": sum(r.total_snippets for r in reports),
+            "valid": sum(r.valid_count for r in reports),
+            "outdated": sum(r.outdated_count for r in reports),
+            "not_found": sum(r.not_found_count for r in reports),
+        },
+        "files": [],
+    }
+
+    for report in reports:
+        try:
+            rel_path = str(report.doc_path.relative_to(base_path))
+        except ValueError:
+            rel_path = str(report.doc_path)
+
+        file_data = {
+            "path": rel_path,
+            "total_snippets": report.total_snippets,
+            "valid": report.valid_count,
+            "outdated": report.outdated_count,
+            "not_found": report.not_found_count,
+            "snippets": [],
+        }
+
+        for result in report.results:
+            snippet_data = {
+                "line": result.snippet.line,
+                "language": result.snippet.language,
+                "status": result.status.value,
+                "similarity": result.similarity,
+            }
+            if result.source_match:
+                snippet_data["source_file"] = str(result.source_match.file_path)
+                snippet_data["source_line"] = result.source_match.start_line
+            if result.diff:
+                snippet_data["diff"] = result.diff
+
+            file_data["snippets"].append(snippet_data)
+
+        output["files"].append(file_data)
+
+    return json.dumps(output, indent=2)
+
+
+def _get_snippet_markdown_output(reports: List[SnippetReport], base_path: Path) -> str:
+    """Get snippet validation results as Markdown string."""
+    total_snippets = sum(r.total_snippets for r in reports)
+    total_valid = sum(r.valid_count for r in reports)
+    total_outdated = sum(r.outdated_count for r in reports)
+    total_not_found = sum(r.not_found_count for r in reports)
+
+    lines = []
+    lines.append("# Code Snippet Validation Report\n")
+
+    # Summary
+    lines.append("## Summary\n")
+    lines.append("| Metric | Count |")
+    lines.append("|--------|-------|")
+    lines.append(f"| Files Checked | {len(reports)} |")
+    lines.append(f"| Total Snippets | {total_snippets} |")
+    lines.append(f"| Valid | {total_valid} |")
+    lines.append(f"| Outdated | {total_outdated} |")
+    lines.append(f"| Not Found | {total_not_found} |")
+    lines.append("")
+
+    if total_outdated == 0:
+        lines.append("> All code snippets are valid!\n")
+    else:
+        lines.append(f"> Found {total_outdated} outdated snippet(s)\n")
+
+    # Details
+    if total_outdated > 0:
+        lines.append("## Outdated Snippets\n")
+
+        for report in reports:
+            if report.outdated_count == 0:
+                continue
+
+            try:
+                rel_path = report.doc_path.relative_to(base_path)
+            except ValueError:
+                rel_path = report.doc_path
+
+            lines.append(f"### `{rel_path}`\n")
+            lines.append("| Line | Language | Source | Similarity |")
+            lines.append("|------|----------|--------|------------|")
+
+            for result in report.results:
+                if result.status == ValidationStatus.OUTDATED:
+                    source = f"`{result.source_match.file_path.name}:{result.source_match.start_line}`" if result.source_match else "-"
+                    lines.append(f"| {result.snippet.line} | {result.snippet.language} | {source} | {result.similarity:.1%} |")
+
+            lines.append("")
+
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

@@ -32,7 +32,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         clean-docs doctor || true  # Doctor is informational only
-        clean-docs scan . --internal-only --format json > link-check-results.json || true
+        # Exclude test directories which have intentional broken links
+        clean-docs scan . --internal-only --exclude "test_docs/*" --exclude "test_src/*" --format json > link-check-results.json || true
     
     - name: Upload results
       uses: actions/upload-artifact@v4

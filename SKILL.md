@@ -1,13 +1,13 @@
 ---
 name: clean-docs
-description: Validate documentation quality - check for broken links, validate code snippets against source code, and auto-fix issues. Use when working with markdown documentation, README files, or when the user wants to check documentation for broken links or outdated code examples.
+description: "Validate documentation quality - check for broken links, validate code snippets against source code, and auto-fix issues. Use when working with markdown documentation, README files, or when the user wants to check documentation for broken links or outdated code examples."
 license: MIT
 metadata:
   author: Algiras
   version: "0.1.0"
-  homepage: https://github.com/Algiras/clean-docs
-  docs: https://algiras.github.io/clean-docs
-compatibility: Requires Python 3.10+. Optional: tree-sitter for code snippet validation.
+  homepage: "https://github.com/Algiras/clean-docs"
+  docs: "https://algiras.github.io/clean-docs"
+compatibility: "Requires Python 3.10+. Optional tree-sitter for code snippet validation."
 ---
 
 # Clean Docs

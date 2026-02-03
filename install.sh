@@ -1,9 +1,10 @@
 #!/bin/bash
 #
 # Clean Docs CLI Install Script
-# Usage: curl -fsSL https://raw.githubusercontent.com/owner/clean-docs/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
 #
 # Environment variables:
+#   WITH_SNIPPETS=1  - Install with code snippet validation support
 #   WITH_SEMANTIC=1  - Install with semantic analysis support
 #
 
@@ -20,6 +21,7 @@ NC='\033[0m' # No Color
 PACKAGE_NAME="clean-docs"
 MIN_PYTHON_VERSION="3.10"
 INSTALL_DIR=""
+WITH_SNIPPETS=false
 WITH_SEMANTIC=false
 
 # Functions
@@ -175,23 +177,30 @@ check_prerequisites() {
 # Install clean-docs
 install_package() {
     log_info "Installing $PACKAGE_NAME..."
-    
+
     INSTALL_ARGS="--user"
-    
+
     # Check if we're in a virtual environment
     if [ -n "$VIRTUAL_ENV" ]; then
         log_info "Detected virtual environment, installing without --user"
         INSTALL_ARGS=""
     fi
-    
-    # Install command
-    if [ "$WITH_SEMANTIC" = true ]; then
+
+    # Build extras list
+    EXTRAS=""
+    if [ "$WITH_SNIPPETS" = true ] && [ "$WITH_SEMANTIC" = true ]; then
+        EXTRAS="[snippets,semantic]"
+        log_info "Installing with snippet validation and semantic analysis support..."
+    elif [ "$WITH_SNIPPETS" = true ]; then
+        EXTRAS="[snippets]"
+        log_info "Installing with snippet validation support..."
+    elif [ "$WITH_SEMANTIC" = true ]; then
+        EXTRAS="[semantic]"
         log_info "Installing with semantic analysis support..."
-        INSTALL_CMD="$PIP_CMD install $INSTALL_ARGS $PACKAGE_NAME[semantic]"
-    else
-        INSTALL_CMD="$PIP_CMD install $INSTALL_ARGS $PACKAGE_NAME"
     fi
-    
+
+    INSTALL_CMD="$PIP_CMD install $INSTALL_ARGS $PACKAGE_NAME$EXTRAS"
+
     log_info "Running: $INSTALL_CMD"
     if eval "$INSTALL_CMD"; then
         log_success "$PACKAGE_NAME installed successfully"
@@ -262,15 +271,16 @@ add_to_path_instructions() {
 # Verify installation
 verify_installation() {
     log_info "Verifying installation..."
-    
+
     if check_in_path; then
         VERSION=$(clean-docs --version 2>/dev/null || echo "unknown")
         log_success "Clean Docs $VERSION is ready to use!"
         echo ""
         log_info "Quick start:"
-        echo "  clean-docs doctor          # Check your setup"
-        echo "  clean-docs scan ./docs     # Scan your documentation"
-        echo "  clean-docs --help          # Show all commands"
+        echo "  clean-docs doctor              # Check your setup"
+        echo "  clean-docs scan ./docs         # Scan for broken links"
+        echo "  clean-docs validate-snippets . # Validate code snippets"
+        echo "  clean-docs --help              # Show all commands"
     else
         log_warning "Installation complete but 'clean-docs' not in PATH"
         add_to_path_instructions
@@ -281,7 +291,16 @@ verify_installation() {
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
+            --snippets)
+                WITH_SNIPPETS=true
+                shift
+                ;;
             --semantic)
+                WITH_SEMANTIC=true
+                shift
+                ;;
+            --all)
+                WITH_SNIPPETS=true
                 WITH_SEMANTIC=true
                 shift
                 ;;
@@ -292,9 +311,10 @@ parse_args() {
             --help)
                 echo "Clean Docs CLI Installer"
                 echo ""
-                echo "Usage: curl -fsSL [url] | bash"
+                echo "Usage: curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash"
                 echo ""
                 echo "Options (passed via environment variables):"
+                echo "  WITH_SNIPPETS=1  Install with code snippet validation"
                 echo "  WITH_SEMANTIC=1  Install with semantic analysis support"
                 echo ""
                 exit 0
@@ -309,12 +329,15 @@ parse_args() {
 # Main installation
 main() {
     print_banner
-    
+
     # Parse environment variables
+    if [ -n "$WITH_SNIPPETS" ] && [ "$WITH_SNIPPETS" = "1" ]; then
+        WITH_SNIPPETS=true
+    fi
     if [ -n "$WITH_SEMANTIC" ] && [ "$WITH_SEMANTIC" = "1" ]; then
         WITH_SEMANTIC=true
     fi
-    
+
     parse_args "$@"
     
     OS=$(detect_os)

@@ -1,6 +1,6 @@
 # Clean Docs
 
-> CLI tool for documentation quality - detect broken links, auto-fix issues, and integrate with CI/CD.
+> CLI tool for documentation quality - validate code snippets, detect broken links, auto-fix issues, and integrate with CI/CD.
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -12,23 +12,43 @@
 
 ## Features
 
-- **Link Checking** - Internal files, external URLs, GitHub repos, anchors
-- **Auto-fixing** - Missing extensions, anchor typos, case issues
-- **Smart Caching** - SQLite-based with 24h TTL, batch operations
-- **CODEOWNERS Support** - Group issues by team, create PRs per owner
-- **CI/CD Ready** - JSON/Markdown output, GitHub annotations, exit codes
+- **🔍 Code Snippet Validation** - Validate code examples against actual source code using [tree-sitter](https://tree-sitter.github.io/)
+- **🔗 Link Checking** - Internal files, external URLs, GitHub repos, anchors
+- **🔧 Auto-fixing** - Outdated snippets, missing extensions, anchor typos, case issues
+- **💾 Smart Caching** - SQLite-based with 24h TTL, batch operations
+- **👥 CODEOWNERS Support** - Group issues by team, create PRs per owner
+- **🚀 CI/CD Ready** - JSON/Markdown output, GitHub annotations, exit codes
+
+## Installation
+
+```bash
+# Quick install (curl)
+curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
+
+# With snippet validation
+curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash -s -- --snippets
+
+# With all features
+curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash -s -- --all
+
+# Or via pip
+pip install clean-docs                    # Core features
+pip install 'clean-docs[snippets]'        # + Code snippet validation
+pip install 'clean-docs[semantic]'        # + AI-powered analysis
+pip install 'clean-docs[snippets,semantic]'  # All features
+```
 
 ## Quick Start
 
 ```bash
-# Install
-pip install -e .  # or: pip install clean-docs (when published)
-
 # Check setup
 clean-docs doctor
 
-# Scan documentation
+# Scan documentation for broken links
 clean-docs scan ./docs
+
+# Validate code snippets against source
+clean-docs validate-snippets ./docs --code-dir ./src
 
 # Auto-fix issues
 clean-docs scan ./docs --fix --yes
@@ -100,6 +120,38 @@ clean-docs fix-prs . --codeowners CODEOWNERS
 clean-docs fix-prs . --only-owner @myteam/docs
 ```
 
+### Code Snippet Validation
+
+Validate that code examples in documentation match actual source code:
+
+```bash
+# Install with snippet validation support
+pip install 'clean-docs[snippets]'
+
+# Validate snippets against source code
+clean-docs validate-snippets ./docs --code-dir ./src
+
+# Preview what would be fixed
+clean-docs validate-snippets README.md --fix --dry-run
+
+# Auto-fix outdated snippets
+clean-docs validate-snippets ./docs --fix
+
+# Adjust similarity threshold (default: 0.8)
+clean-docs validate-snippets . --threshold 0.7
+
+# Output as JSON for CI
+clean-docs validate-snippets . --format json
+```
+
+**Supported languages:** Java, Python, Scala, TypeScript, JavaScript, Go, Rust, Bazel
+
+**How it works:**
+1. Extracts code blocks from markdown files
+2. Parses source code using [tree-sitter](https://tree-sitter.github.io/) to index symbols
+3. Matches snippets to source using file hints, symbol names, and code similarity
+4. Reports outdated examples with diffs and suggested fixes
+
 ### Semantic Analysis (AI-Powered)
 
 Find orphaned docs and missing documentation using embeddings:
@@ -111,7 +163,7 @@ pip install 'clean-docs[semantic]'
 # Find docs with no related code
 clean-docs semantic . --orphaned
 
-# Find code without documentation  
+# Find code without documentation
 clean-docs semantic . --missing
 
 # Both with custom threshold
@@ -189,7 +241,7 @@ jobs:
 | Code | Meaning |
 |------|---------|
 | `0` | All checks passed |
-| `1` | Broken links found |
+| `1` | Issues found (broken links, outdated snippets) |
 
 ## Link Types Supported
 
@@ -204,6 +256,7 @@ jobs:
 
 | Fixable | Example |
 |---------|---------|
+| Outdated code snippets | Updates examples to match current source |
 | Missing extension | `./file` → `./file.md` |
 | Anchor normalization | `#My-Section` → `#my-section` |
 | Case sensitivity | `./File.md` → `./file.md` |
@@ -212,6 +265,7 @@ jobs:
 - External 404s
 - Deleted files with no redirect
 - Semantic anchor changes
+- Code snippets with no source match
 
 ## Development
 

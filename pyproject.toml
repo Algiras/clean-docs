@@ -1,20 +1,46 @@
 [project]
 name = "clean-docs"
 version = "0.1.0"
-description = "CLI tool for cleaning up documentation - link checking, semantic analysis, and code sync"
+description = "CLI tool for documentation quality - validate code snippets, detect broken links, auto-fix issues"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
+authors = [
+    {name = "Algimantas Krasauskas", email = "algimantas.krasauskas@gmail.com"},
+]
+keywords = [
+    "documentation",
+    "docs",
+    "linting",
+    "markdown",
+    "code-snippets",
+    "link-checker",
+    "tree-sitter",
+    "cli",
+    "devtools",
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Text Processing :: Markup :: Markdown",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Algiras/clean-docs"
+Documentation = "https://algiras.github.io/clean-docs"
+Repository = "https://github.com/Algiras/clean-docs.git"
+Issues = "https://github.com/Algiras/clean-docs/issues"
+Changelog = "https://github.com/Algiras/clean-docs/releases"
 dependencies = [
     "typer[all]>=0.9.0",
     "rich>=13.0.0",

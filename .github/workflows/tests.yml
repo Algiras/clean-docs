@@ -44,25 +44,48 @@ jobs:
       run: |
         black --check clean_docs/ || true
 
-  test-semantic:
+  test-snippets:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    
+
+    - name: Install with snippets dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,snippets]"
+
+    - name: Test snippet validation imports
+      run: |
+        python -c "from clean_docs.symbol_indexer import SymbolIndexer; print('Snippets deps OK')"
+
+    - name: Run snippet validation tests
+      run: |
+        pytest tests/test_snippet_validator.py -v
+
+  test-semantic:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
     - name: Install with semantic dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e ".[dev,semantic]"
-    
+
     - name: Test semantic imports
       run: |
         python -c "from clean_docs.semantic import EmbeddingManager; print('Semantic deps OK')"
-    
+
     - name: Run full test suite
       run: |
         pytest tests/ -v

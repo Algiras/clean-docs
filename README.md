@@ -5,10 +5,14 @@
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://github.com/Algiras/clean-docs/actions/workflows/tests.yml/badge.svg)](https://github.com/Algiras/clean-docs/actions/workflows/tests.yml)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://algiras.github.io/clean-docs)
+[![PyPI](https://img.shields.io/pypi/v/clean-docs)](https://pypi.org/project/clean-docs/)
 
 <p align="center">
   <img src="demo.gif" alt="clean-docs demo" width="700">
 </p>
+
+**[Documentation](https://algiras.github.io/clean-docs)** | **[Installation](#installation)** | **[Quick Start](#quick-start)** | **[CI/CD Integration](https://algiras.github.io/clean-docs/guides/ci-cd/)**
 
 ## Features
 

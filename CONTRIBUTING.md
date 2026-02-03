@@ -14,7 +14,7 @@ Thank you for your interest in contributing to Clean Docs! This document provide
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/clean-docs.git
+git clone https://github.com/Algiras/clean-docs.git
 cd clean-docs
 
 # Create a virtual environment
@@ -22,7 +22,7 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install in development mode with all dependencies
-pip install -e ".[dev,semantic]"
+pip install -e ".[dev,snippets,semantic]"
 
 # Run tests to verify setup
 pytest

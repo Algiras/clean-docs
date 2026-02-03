@@ -27,20 +27,14 @@
 ## Installation
 
 ```bash
-# Quick install (curl)
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
-
-# With snippet validation
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash -s -- --snippets
-
-# With all features
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash -s -- --all
-
-# Or via pip
-pip install clean-docs                    # Core features
-pip install 'clean-docs[snippets]'        # + Code snippet validation
-pip install 'clean-docs[semantic]'        # + AI-powered analysis
+# Via pip (recommended)
+pip install clean-docs                       # Core features
+pip install 'clean-docs[snippets]'           # + Code snippet validation
+pip install 'clean-docs[semantic]'           # + AI-powered analysis
 pip install 'clean-docs[snippets,semantic]'  # All features
+
+# Or via curl installer
+curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
 ```
 
 ## Quick Start

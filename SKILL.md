@@ -17,14 +17,12 @@ A CLI tool for documentation quality - validate code snippets, detect broken lin
 ## Installation
 
 ```bash
-# Quick install
+# Via pip (recommended)
+pip install clean-docs                 # Core features
+pip install 'clean-docs[snippets]'     # + Code snippet validation
+
+# Or via curl installer
 curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
-
-# Or via pip
-pip install clean-docs
-
-# With code snippet validation
-pip install 'clean-docs[snippets]'
 ```
 
 ## Core Commands

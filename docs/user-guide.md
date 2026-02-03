@@ -20,16 +20,14 @@ Complete guide to using Clean Docs CLI for documentation maintenance.
 Choose your installation method:
 
 ```bash
-# Quick install (recommended)
+# Via pip (recommended)
+pip install clean-docs                       # Core features
+pip install 'clean-docs[snippets]'           # + Code snippet validation
+pip install 'clean-docs[semantic]'           # + AI-powered analysis
+pip install 'clean-docs[snippets,semantic]'  # All features
+
+# Or via curl installer
 curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
-
-# With semantic analysis support
-WITH_SEMANTIC=1 curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
-
-# Or via pip
-pip install clean-docs
-# With semantic analysis
-pip install clean-docs[semantic]
 ```
 
 ### Verify Installation

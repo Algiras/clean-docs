@@ -43,16 +43,13 @@
 ### Installation
 
 ```bash
-# Quick install
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
-
-# With all features
-curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash -s -- --all
-
-# Or via pip
+# Via pip (recommended)
 pip install clean-docs                       # Core features
 pip install 'clean-docs[snippets]'           # + Code snippet validation
 pip install 'clean-docs[snippets,semantic]'  # All features
+
+# Or via curl installer
+curl -fsSL https://raw.githubusercontent.com/Algiras/clean-docs/main/install.sh | bash
 ```
 
 ### Basic Usage

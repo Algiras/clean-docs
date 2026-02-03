@@ -7,6 +7,7 @@
 [![Tests](https://github.com/Algiras/clean-docs/actions/workflows/tests.yml/badge.svg)](https://github.com/Algiras/clean-docs/actions/workflows/tests.yml)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://algiras.github.io/clean-docs)
 [![PyPI](https://img.shields.io/pypi/v/clean-docs)](https://pypi.org/project/clean-docs/)
+[![Agent Skill](https://img.shields.io/badge/agent%20skill-agentskills.io-purple)](https://agentskills.io)
 
 <p align="center">
   <img src="demo.gif" alt="clean-docs demo" width="700">
@@ -270,6 +271,19 @@ jobs:
 - Deleted files with no redirect
 - Semantic anchor changes
 - Code snippets with no source match
+
+## Agent Skill
+
+Clean Docs is available as an [Agent Skill](https://agentskills.io) for AI coding assistants like Claude Code, Cursor, and others.
+
+```bash
+# Install the skill (example for skills-compatible agents)
+npx skills add Algiras/clean-docs
+```
+
+The skill enables AI agents to check documentation quality, find broken links, and validate code snippets automatically.
+
+See [`skills/clean-docs/SKILL.md`](skills/clean-docs/SKILL.md) for the skill definition.
 
 ## Development
 

@@ -106,7 +106,23 @@ class CacheManager:
                 value TEXT
             )
         """)
-        
+
+        # Symbol index cache for snippet validation
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS symbol_index (
+                file_path TEXT PRIMARY KEY,
+                content_hash TEXT NOT NULL,
+                symbols TEXT NOT NULL,
+                timestamp REAL NOT NULL
+            )
+        """)
+
+        # Index for symbol cache lookups
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_symbol_index_hash
+            ON symbol_index(content_hash)
+        """)
+
         conn.commit()
         conn.close()
     
@@ -291,7 +307,99 @@ class CacheManager:
             }
             for row in cursor.fetchall()
         ]
-    
+
+    # Symbol index caching methods
+
+    def get_symbol_index(self, file_path: str, content_hash: str) -> Optional[str]:
+        """Get cached symbol index for a file if content hasn't changed.
+
+        Args:
+            file_path: Path to the source file
+            content_hash: Hash of current file content
+
+        Returns:
+            JSON string of symbols if cached and valid, None otherwise
+        """
+        conn = self._get_conn()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """SELECT symbols, content_hash FROM symbol_index WHERE file_path = ?""",
+            (file_path,)
+        )
+        row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        # Check if content hash matches
+        if row["content_hash"] != content_hash:
+            return None
+
+        return row["symbols"]
+
+    def set_symbol_index(
+        self,
+        file_path: str,
+        content_hash: str,
+        symbols_json: str,
+    ) -> None:
+        """Cache symbol index for a file.
+
+        Args:
+            file_path: Path to the source file
+            content_hash: Hash of file content
+            symbols_json: JSON string of extracted symbols
+        """
+        conn = self._get_conn()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """INSERT OR REPLACE INTO symbol_index
+               (file_path, content_hash, symbols, timestamp)
+               VALUES (?, ?, ?, ?)""",
+            (file_path, content_hash, symbols_json, time.time()),
+        )
+
+    def set_symbol_indexes_batch(
+        self,
+        entries: List[Tuple[str, str, str]],
+    ) -> None:
+        """Cache multiple symbol indexes in a single transaction.
+
+        Args:
+            entries: List of (file_path, content_hash, symbols_json) tuples
+        """
+        if not entries:
+            return
+
+        timestamp = time.time()
+        with self._transaction() as cursor:
+            cursor.executemany(
+                """INSERT OR REPLACE INTO symbol_index
+                   (file_path, content_hash, symbols, timestamp)
+                   VALUES (?, ?, ?, ?)""",
+                [(fp, ch, sj, timestamp) for fp, ch, sj in entries]
+            )
+
+    def clear_symbol_index(self) -> None:
+        """Clear all symbol index entries."""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM symbol_index")
+
+    def get_symbol_index_stats(self) -> dict:
+        """Get statistics about the symbol index cache."""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COUNT(*) as count FROM symbol_index")
+        row = cursor.fetchone()
+
+        return {
+            "indexed_files": row["count"] or 0,
+        }
+
     def __del__(self):
         """Ensure connection is closed on garbage collection."""
         self.close()

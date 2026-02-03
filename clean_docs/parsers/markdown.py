@@ -1,12 +1,22 @@
 """Markdown parser to extract links and structure."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Set
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
+
+
+@dataclass
+class CodeBlock:
+    """Represents a code block found in markdown."""
+    language: str           # "java", "python", "scala", etc.
+    code: str               # The actual code content
+    line: int               # Line number in markdown
+    file_hint: Optional[str] = None  # Extracted from comments like "// src/Foo.java"
+    symbols: List[str] = field(default_factory=list)  # Extracted class/function names
 
 
 @dataclass
@@ -29,6 +39,7 @@ class MarkdownDocument:
     links: List[Link]
     headings: List[tuple]  # (level, text, line)
     references: dict  # reference label -> url
+    code_blocks: List[CodeBlock] = field(default_factory=list)
 
 
 class MarkdownParser:
@@ -47,7 +58,8 @@ class MarkdownParser:
         links = []
         headings = []
         references = {}
-        
+        code_blocks = []
+
         # First pass: find all reference definitions
         ref_pattern = re.compile(
             r'^\s*\[([^\]]+)\]:\s*(\S+)(?:\s+"([^"]+)")?\s*$',
@@ -112,7 +124,25 @@ class MarkdownParser:
                     heading_text = tokens[i + 1].content
                     line_num = token.map[0] + 1 if token.map else 0
                     headings.append((level, heading_text, line_num))
-        
+
+            elif token.type == "fence":
+                # Fenced code block
+                language = token.info.strip().split()[0] if token.info else ""
+                code_content = token.content
+                line_num = token.map[0] + 1 if token.map else 0
+
+                # Extract file hint and symbols
+                file_hint = self._extract_file_hint(code_content, language)
+                symbols = self._extract_symbols(code_content, language)
+
+                code_blocks.append(CodeBlock(
+                    language=language,
+                    code=code_content,
+                    line=line_num,
+                    file_hint=file_hint,
+                    symbols=symbols,
+                ))
+
         # Resolve reference-style links
         for link in links:
             if link.url.startswith("[") and link.url.endswith("]"):
@@ -133,12 +163,108 @@ class MarkdownParser:
             links=links,
             headings=headings,
             references=references,
+            code_blocks=code_blocks,
         )
     
     def _build_line_map(self, content: str, tokens: List[Token]) -> dict:
         """Build a mapping of token positions to line numbers."""
         lines = content.split('\n')
         return {}
+
+    def _extract_file_hint(self, code: str, language: str) -> Optional[str]:
+        """Extract file path hint from code comments.
+
+        Looks for patterns like:
+        - // src/Foo.java
+        - # src/foo.py
+        - // File: src/Foo.java
+        - /* src/Foo.java */
+        """
+        # Common file path patterns in comments
+        patterns = [
+            # Single-line comments with file path
+            r'(?://|#)\s*(?:File:\s*)?([^\s]+\.[a-zA-Z]+)',
+            # Block comments with file path
+            r'/\*\s*(?:File:\s*)?([^\s]+\.[a-zA-Z]+)\s*\*/',
+            # Path-like patterns at the start
+            r'^(?://|#)\s*([\w/.-]+\.[a-zA-Z]+)',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, code, re.MULTILINE)
+            if match:
+                path = match.group(1)
+                # Validate it looks like a file path
+                if '/' in path or '\\' in path or '.' in path:
+                    return path
+
+        return None
+
+    def _extract_symbols(self, code: str, language: str) -> List[str]:
+        """Extract class/function/method names from code snippet.
+
+        Uses regex-based extraction for common patterns.
+        """
+        symbols = []
+
+        # Java/Scala patterns
+        if language in ("java", "scala", "kotlin"):
+            # Class/interface/trait definitions
+            for match in re.finditer(r'\b(?:class|interface|trait|object|enum)\s+(\w+)', code):
+                symbols.append(match.group(1))
+            # Method definitions
+            for match in re.finditer(r'\b(?:public|private|protected|def|fun)\s+\w*\s*(\w+)\s*\(', code):
+                symbols.append(match.group(1))
+
+        # Python patterns
+        elif language in ("python", "py"):
+            # Class definitions
+            for match in re.finditer(r'\bclass\s+(\w+)', code):
+                symbols.append(match.group(1))
+            # Function definitions
+            for match in re.finditer(r'\bdef\s+(\w+)', code):
+                symbols.append(match.group(1))
+
+        # JavaScript/TypeScript patterns
+        elif language in ("javascript", "typescript", "js", "ts", "jsx", "tsx"):
+            # Class definitions
+            for match in re.finditer(r'\bclass\s+(\w+)', code):
+                symbols.append(match.group(1))
+            # Function definitions (including async)
+            for match in re.finditer(r'\b(?:async\s+)?function\s+(\w+)', code):
+                symbols.append(match.group(1))
+            # Arrow functions and const functions
+            for match in re.finditer(r'\bconst\s+(\w+)\s*=\s*(?:async\s*)?\(', code):
+                symbols.append(match.group(1))
+
+        # Go patterns
+        elif language == "go":
+            # Function definitions
+            for match in re.finditer(r'\bfunc\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)', code):
+                symbols.append(match.group(1))
+            # Type definitions
+            for match in re.finditer(r'\btype\s+(\w+)\s+(?:struct|interface)', code):
+                symbols.append(match.group(1))
+
+        # Rust patterns
+        elif language in ("rust", "rs"):
+            # Function definitions
+            for match in re.finditer(r'\bfn\s+(\w+)', code):
+                symbols.append(match.group(1))
+            # Struct/enum definitions
+            for match in re.finditer(r'\b(?:struct|enum|trait|impl)\s+(\w+)', code):
+                symbols.append(match.group(1))
+
+        # Bazel/Starlark patterns
+        elif language in ("bazel", "starlark", "bzl"):
+            # Rule/macro definitions
+            for match in re.finditer(r'\bdef\s+(\w+)', code):
+                symbols.append(match.group(1))
+            # Target names
+            for match in re.finditer(r'name\s*=\s*["\']([^"\']+)["\']', code):
+                symbols.append(match.group(1))
+
+        return list(dict.fromkeys(symbols))  # Remove duplicates while preserving order
     
     def find_all_markdown_files(self, root: Path) -> List[Path]:
         """Find all markdown files in directory."""

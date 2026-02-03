@@ -49,3 +49,6 @@ htmlcov/
 
 # VHS tape files (keep GIF, ignore source)
 *.tape
+
+# Agent skills installed locally
+.agents/

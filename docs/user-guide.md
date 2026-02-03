@@ -451,4 +451,4 @@ fi
 
 ---
 
-**Next:** See [API Documentation](api.md) for programmatic usage.
+**Next:** Check the [CI/CD Integration guide](guides/ci-cd.md) for automation setup.

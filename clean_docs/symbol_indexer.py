@@ -7,10 +7,9 @@ snippet validation features will be disabled gracefully.
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple
 
 # Optional dependencies - gracefully handle if not installed
 try:
@@ -199,7 +198,7 @@ class SymbolIndexer:
         lines = content.split('\n')
 
         # Use pattern matching on node types
-        config = LANGUAGE_CONFIG.get(language, {})
+        LANGUAGE_CONFIG.get(language, {})
 
         def visit_node(node: Node) -> None:
             symbol = self._try_extract_symbol(node, file_path, lines, language)

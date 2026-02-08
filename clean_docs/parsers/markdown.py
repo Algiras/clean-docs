@@ -74,8 +74,8 @@ class MarkdownParser:
         tokens = self.md.parse(content)
         
         # Track line numbers
-        lines = content.split('\n')
-        line_map = self._build_line_map(content, tokens)
+        content.split('\n')
+        self._build_line_map(content, tokens)
         
         for i, token in enumerate(tokens):
             if token.type == "inline" and token.children:
@@ -168,7 +168,7 @@ class MarkdownParser:
     
     def _build_line_map(self, content: str, tokens: List[Token]) -> dict:
         """Build a mapping of token positions to line numbers."""
-        lines = content.split('\n')
+        content.split('\n')
         return {}
 
     def _extract_file_hint(self, code: str, language: str) -> Optional[str]:

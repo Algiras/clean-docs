@@ -3,7 +3,6 @@
 import asyncio
 import fnmatch
 import json
-import sys
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional
@@ -11,9 +10,8 @@ from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
 from rich.table import Table
-from rich.text import Text
 
 from clean_docs import __version__
 from clean_docs.cache import CacheManager
@@ -21,8 +19,8 @@ from clean_docs.config import Config, DEFAULT_CONFIG_CONTENT
 from clean_docs.doctor import Doctor
 from clean_docs.fixer import LinkFixer
 from clean_docs.init_wizard import InitWizard
-from clean_docs.link_checker import LinkChecker, LinkResult, LinkStatus
-from clean_docs.parsers.markdown import MarkdownParser, CodeBlock
+from clean_docs.link_checker import LinkChecker, LinkStatus
+from clean_docs.parsers.markdown import MarkdownParser
 from clean_docs.semantic import EmbeddingManager, SemanticAnalyzer, SEMANTIC_AVAILABLE
 from clean_docs.codeowners import CodeOwners
 from clean_docs.pr_pipeline import PRPipeline
@@ -330,7 +328,7 @@ def scan(
             )
             
             if attempted > 0:
-                console.print(f"\n[bold green]Fix loop complete:[/bold green]")
+                console.print("\n[bold green]Fix loop complete:[/bold green]")
                 console.print(f"  Iterations: {iterations}")
                 console.print(f"  Total fixes applied: {succeeded}/{attempted}")
             
@@ -366,7 +364,7 @@ def scan(
     output_content = None
     if output_file or format != OutputFormat.CONSOLE:
         import io
-        output_buffer = io.StringIO()
+        io.StringIO()
     
     # Print results
     if format == OutputFormat.JSON:
@@ -643,7 +641,7 @@ def _print_console_results(results, fix: bool, dry_run: bool, verbose: bool, tot
             console.print(f"\n[yellow]Dry run mode - would attempt to fix {total_broken} broken links[/yellow]")
             console.print("[dim]Run without --dry-run to apply fixes[/dim]")
         else:
-            console.print(f"\n[yellow]Fix mode not yet implemented in MVP[/yellow]")
+            console.print("\n[yellow]Fix mode not yet implemented in MVP[/yellow]")
             console.print("[dim]Use --dry-run to see what would be fixed[/dim]")
     
     # Final status
@@ -1395,7 +1393,7 @@ def _print_snippet_console_results(reports: List[SnippetReport], base_path: Path
                     console.print(f"    [dim]Source: {result.source_match.file_path}:{result.source_match.start_line}[/dim]")
                 console.print(f"    [dim]Similarity: {result.similarity:.1%}[/dim]")
                 if result.diff and verbose:
-                    console.print(f"    [dim]Diff:[/dim]")
+                    console.print("    [dim]Diff:[/dim]")
                     for line in result.diff.split('\n')[:10]:
                         if line.startswith('+'):
                             console.print(f"      [green]{line}[/green]")

@@ -6,12 +6,10 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
-from clean_docs.link_checker import CheckResults, LinkResult, LinkStatus, LinkChecker
-from clean_docs.parsers.markdown import MarkdownParser, MarkdownDocument
-import asyncio
+from clean_docs.link_checker import LinkResult, LinkStatus, LinkChecker
+from clean_docs.parsers.markdown import MarkdownParser
 
 
 @dataclass
@@ -145,7 +143,7 @@ class LinkFixer:
                         line=link.line,
                         original_url=url,
                         suggested_url=md_url,
-                        description=f"Add .md extension",
+                        description="Add .md extension",
                         auto_fixable=True,
                     )
         

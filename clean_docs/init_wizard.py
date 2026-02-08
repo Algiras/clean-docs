@@ -1,7 +1,5 @@
 """Interactive initialization wizard for Clean Docs."""
 
-import os
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -11,7 +9,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
 
-from clean_docs.config import Config, DEFAULT_CONFIG_CONTENT
+from clean_docs.config import Config
 
 
 @dataclass
@@ -438,7 +436,7 @@ class InitWizard:
             self.console.print(f"[green]✓[/green] Created directory {dir_path}")
         
         # Create README
-        readme_content = f"""# Documentation
+        readme_content = """# Documentation
 
 Welcome to the documentation!
 
@@ -697,4 +695,4 @@ MIT License - see [LICENSE](LICENSE) file.
         for step in steps:
             self.console.print(step)
         
-        self.console.print(f"\n[green bold]Happy documenting! 📝[/green bold]\n")
+        self.console.print("\n[green bold]Happy documenting! 📝[/green bold]\n")

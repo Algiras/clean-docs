@@ -6,10 +6,10 @@ import difflib
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, Tuple
 
 from clean_docs.parsers.markdown import CodeBlock
-from clean_docs.symbol_indexer import Symbol, SymbolIndexer, SNIPPETS_AVAILABLE
+from clean_docs.symbol_indexer import Symbol, SymbolIndexer
 
 
 class ValidationStatus(str, Enum):

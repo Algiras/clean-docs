@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Set
-from urllib.parse import urlparse
 
 import aiohttp
 
@@ -311,7 +310,7 @@ class LinkChecker:
                     link=link,
                     status=LinkStatus.BROKEN,
                     error_message=f"Repository {owner}/{repo} not found or not accessible",
-                    suggestion=f"Check if the repository exists and is public",
+                    suggestion="Check if the repository exists and is public",
                 )
             
             # If there's a branch and path, check them
@@ -589,7 +588,7 @@ class LinkChecker:
         if "#" in url:
             file_part, anchor = url.split("#", 1)
         else:
-            file_part, anchor = url, None
+            file_part, _anchor = url, None
         
         # Remove leading slash and resolve from base
         target_path = (base_path / file_part.lstrip("/")).resolve()

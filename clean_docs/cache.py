@@ -1,6 +1,5 @@
 """Cache manager for link status and embeddings with optimized SQLite."""
 
-import hashlib
 import sqlite3
 import threading
 import time

@@ -1,11 +1,10 @@
 """Configuration management for Clean Docs with validation."""
 
-import os
 import tempfile
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
 import yaml
 

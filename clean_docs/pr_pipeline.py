@@ -1,11 +1,10 @@
 """PR Pipeline - Create separate PRs per CODEOWNERS group."""
 
-import asyncio
 import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 
 from rich.console import Console
@@ -379,10 +378,10 @@ class PRPipeline:
             
             if create_pr:
                 # Push and create PR
-                self.console.print(f"  Pushing branch...")
+                self.console.print("  Pushing branch...")
                 self._run_git(["push", "-u", "origin", branch_name, "--force"])
                 
-                self.console.print(f"  Creating PR...")
+                self.console.print("  Creating PR...")
                 pr_url = self._create_pr(group, base_branch)
                 result["pr_url"] = pr_url
                 self.console.print(f"  [green]PR created:[/green] {pr_url}")

@@ -3,7 +3,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
@@ -102,17 +102,17 @@ class Doctor:
     def _check_semantic_deps(self) -> None:
         """Check if semantic analysis dependencies are available (optional)."""
         try:
-            import sentence_transformers
-            import torch
+            import sentence_transformers  # noqa: F401
+            import torch  # noqa: F401
             self.checks.append((
-                "Semantic Analysis (Optional)", 
-                True, 
-                f"sentence-transformers available"
+                "Semantic Analysis (Optional)",
+                True,
+                "sentence-transformers available"
             ))
         except ImportError:
             self.checks.append((
-                "Semantic Analysis (Optional)", 
-                False, 
+                "Semantic Analysis (Optional)",
+                False,
                 "Install with: pip install clean-docs[semantic]"
             ))
     

@@ -27,6 +27,7 @@ class LinkStatus(Enum):
 @dataclass
 class LinkResult:
     """Result of checking a single link."""
+
     link: Link
     status: LinkStatus
     status_code: Optional[int] = None
@@ -39,17 +40,18 @@ class LinkResult:
 @dataclass
 class CheckResults:
     """All results from checking a document."""
+
     document: MarkdownDocument
     results: List[LinkResult] = field(default_factory=list)
-    
+
     @property
     def broken_count(self) -> int:
         return sum(1 for r in self.results if r.status == LinkStatus.BROKEN)
-    
+
     @property
     def ok_count(self) -> int:
         return sum(1 for r in self.results if r.status == LinkStatus.OK)
-    
+
     @property
     def total_count(self) -> int:
         return len(self.results)
@@ -57,7 +59,7 @@ class CheckResults:
 
 class LinkChecker:
     """Check links in markdown documents."""
-    
+
     def __init__(
         self,
         cache: CacheManager,
@@ -76,7 +78,7 @@ class LinkChecker:
         self.session: Optional[aiohttp.ClientSession] = None
         self._github_available = self._check_gh_cli()
         self._github_token = os.environ.get("GITHUB_TOKEN")
-    
+
     def _check_gh_cli(self) -> bool:
         """Check if GitHub CLI is available and authenticated."""
         try:
@@ -89,7 +91,7 @@ class LinkChecker:
             return result.returncode == 0
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         connector = aiohttp.TCPConnector(limit=self.concurrency)
@@ -100,45 +102,46 @@ class LinkChecker:
             headers={"User-Agent": "Clean-Docs/0.1.0"},
         )
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         if self.session:
             await self.session.close()
-    
+
     async def check_document(self, doc: MarkdownDocument, base_path: Path) -> CheckResults:
         """Check all links in a document with optimized batch cache lookup."""
         # Pre-fetch all external URLs from cache in one batch query
         external_urls = [
-            link.url for link in doc.links 
+            link.url
+            for link in doc.links
             if link.url.startswith("http://") or link.url.startswith("https://")
         ]
         cached_statuses = self.cache.get_link_statuses_batch(external_urls) if external_urls else {}
-        
+
         # Create semaphore to limit concurrency
         semaphore = asyncio.Semaphore(self.concurrency)
-        
+
         async def check_with_limit(link: Link) -> LinkResult:
             async with semaphore:
                 return await self._check_link(link, doc, base_path, cached_statuses)
-        
+
         # Check all links concurrently
         tasks = [check_with_limit(link) for link in doc.links]
         results = await asyncio.gather(*tasks)
-        
+
         return CheckResults(document=doc, results=list(results))
-    
+
     async def _check_link(
-        self, 
-        link: Link, 
-        doc: MarkdownDocument, 
+        self,
+        link: Link,
+        doc: MarkdownDocument,
         base_path: Path,
         cached_statuses: Optional[Dict[str, dict]] = None,
     ) -> LinkResult:
         """Check a single link."""
         url = link.url
         cached_statuses = cached_statuses or {}
-        
+
         # Skip ignored patterns
         for pattern in self.ignore_patterns:
             if pattern in url:
@@ -147,7 +150,7 @@ class LinkChecker:
                     status=LinkStatus.SKIPPED,
                     error_message=f"Matched ignore pattern: {pattern}",
                 )
-        
+
         # Handle different URL types
         if url.startswith("http://") or url.startswith("https://"):
             return await self._check_external_link(link, cached_statuses)
@@ -159,16 +162,16 @@ class LinkChecker:
             return self._check_absolute_link(link, base_path)
         else:
             return self._check_relative_link(link, doc, base_path)
-    
+
     async def _check_external_link(
-        self, 
+        self,
         link: Link,
         cached_statuses: Optional[Dict[str, dict]] = None,
     ) -> LinkResult:
         """Check an external HTTP/HTTPS link with retry logic."""
         url = link.url
         cached_statuses = cached_statuses or {}
-        
+
         # Check pre-fetched cache first (batch lookup), then individual lookup
         cached = cached_statuses.get(url) or self.cache.get_link_status(url)
         if cached:
@@ -179,22 +182,25 @@ class LinkChecker:
                 error_message=cached.get("error"),
                 from_cache=True,
             )
-        
+
         # Check if it's a GitHub link
         if "github.com" in url:
             return await self._check_github_link(link)
-        
+
         # Regular HTTP check with retry
         last_error = None
         for attempt in range(self.retry_count + 1):
             try:
                 import time
+
                 start = time.time()
                 async with self.session.head(url, allow_redirects=True) as response:
                     elapsed = time.time() - start
-                    
+
                     if response.status < 400:
-                        self.cache.set_link_status(url, "ok", response.status, response_time=elapsed)
+                        self.cache.set_link_status(
+                            url, "ok", response.status, response_time=elapsed
+                        )
                         return LinkResult(
                             link=link,
                             status=LinkStatus.OK,
@@ -206,7 +212,9 @@ class LinkChecker:
                         await asyncio.sleep(self.retry_delay * (attempt + 1))
                         continue
                     else:
-                        self.cache.set_link_status(url, "broken", response.status, response_time=elapsed)
+                        self.cache.set_link_status(
+                            url, "broken", response.status, response_time=elapsed
+                        )
                         return LinkResult(
                             link=link,
                             status=LinkStatus.BROKEN,
@@ -226,7 +234,7 @@ class LinkChecker:
             except Exception as e:
                 last_error = str(e)
                 break
-        
+
         # All retries failed
         if "timed out" in (last_error or "").lower():
             self.cache.set_link_status(url, "timeout", error=last_error)
@@ -242,61 +250,51 @@ class LinkChecker:
                 status=LinkStatus.ERROR,
                 error_message=last_error,
             )
-    
+
     async def _check_github_link(self, link: Link) -> LinkResult:
         """Check a GitHub repository/link."""
         url = link.url
-        
+
         # Parse GitHub URL
         # Patterns: https://github.com/owner/repo or https://github.com/owner/repo/blob/branch/path
-        match = re.match(
-            r'https://github\.com/([^/]+)/([^/]+)(?:/blob/([^/]+)/(.+))?',
-            url
-        )
-        
+        match = re.match(r"https://github\.com/([^/]+)/([^/]+)(?:/blob/([^/]+)/(.+))?", url)
+
         if not match:
             # Not a standard GitHub repo/blob URL, do regular HTTP check
             return await self._check_http_link(link)
-        
+
         owner, repo, branch, path = match.groups()
-        
+
         # Try gh CLI first if available
         if self._github_available:
             return await self._check_github_with_cli(link, owner, repo, branch, path)
-        
+
         # Fall back to API with token
         if self._github_token:
             return await self._check_github_with_api(link, owner, repo, branch, path)
-        
+
         # No GitHub access, do basic HTTP check
         return await self._check_http_link(link)
-    
+
     async def _run_gh_command(self, *args: str, timeout: int = 10) -> tuple[int, str, str]:
         """Run gh CLI command asynchronously."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "gh", *args,
+                "gh",
+                *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=timeout
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
             return proc.returncode or 0, stdout.decode(), stderr.decode()
         except asyncio.TimeoutError:
             if proc:
                 proc.kill()
                 await proc.wait()
             raise
-    
+
     async def _check_github_with_cli(
-        self, 
-        link: Link, 
-        owner: str, 
-        repo: str, 
-        branch: Optional[str], 
-        path: Optional[str]
+        self, link: Link, owner: str, repo: str, branch: Optional[str], path: Optional[str]
     ) -> LinkResult:
         """Check GitHub link using gh CLI (async)."""
         try:
@@ -304,7 +302,7 @@ class LinkChecker:
             returncode, stdout, stderr = await self._run_gh_command(
                 "api", f"repos/{owner}/{repo}", "--jq", ".full_name"
             )
-            
+
             if returncode != 0:
                 return LinkResult(
                     link=link,
@@ -312,14 +310,16 @@ class LinkChecker:
                     error_message=f"Repository {owner}/{repo} not found or not accessible",
                     suggestion="Check if the repository exists and is public",
                 )
-            
+
             # If there's a branch and path, check them
             if branch and path:
                 returncode, stdout, stderr = await self._run_gh_command(
-                    "api", f"repos/{owner}/{repo}/contents/{path}?ref={branch}",
-                    "-H", "Accept: application/vnd.github.v3+json"
+                    "api",
+                    f"repos/{owner}/{repo}/contents/{path}?ref={branch}",
+                    "-H",
+                    "Accept: application/vnd.github.v3+json",
                 )
-                
+
                 if returncode != 0:
                     # Try to find the default branch
                     returncode2, stdout2, stderr2 = await self._run_gh_command(
@@ -334,19 +334,19 @@ class LinkChecker:
                                 error_message=f"File not found in branch '{branch}'",
                                 suggestion=f"Try branch '{default_branch}' instead",
                             )
-                    
+
                     return LinkResult(
                         link=link,
                         status=LinkStatus.BROKEN,
                         error_message=f"File not found: {path}",
                     )
-            
+
             return LinkResult(
                 link=link,
                 status=LinkStatus.OK,
                 status_code=200,
             )
-            
+
         except asyncio.TimeoutError:
             return LinkResult(
                 link=link,
@@ -359,14 +359,9 @@ class LinkChecker:
                 status=LinkStatus.ERROR,
                 error_message=f"GitHub CLI error: {e}",
             )
-    
+
     async def _check_github_with_api(
-        self, 
-        link: Link, 
-        owner: str, 
-        repo: str, 
-        branch: Optional[str], 
-        path: Optional[str]
+        self, link: Link, owner: str, repo: str, branch: Optional[str], path: Optional[str]
     ) -> LinkResult:
         """Check GitHub link using REST API with token."""
         headers = {
@@ -374,7 +369,7 @@ class LinkChecker:
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "Clean-Docs/0.1.0",
         }
-        
+
         try:
             # Check repo
             async with self.session.get(
@@ -394,7 +389,7 @@ class LinkChecker:
                         status_code=response.status,
                         error_message=f"GitHub API error: {response.status}",
                     )
-            
+
             # Check file if path provided
             if path:
                 ref = branch or "HEAD"
@@ -408,28 +403,29 @@ class LinkChecker:
                             status=LinkStatus.BROKEN,
                             error_message=f"File not found in branch '{ref}': {path}",
                         )
-            
+
             return LinkResult(
                 link=link,
                 status=LinkStatus.OK,
                 status_code=200,
             )
-            
+
         except Exception as e:
             return LinkResult(
                 link=link,
                 status=LinkStatus.ERROR,
                 error_message=f"GitHub API error: {e}",
             )
-    
+
     async def _check_http_link(self, link: Link) -> LinkResult:
         """Basic HTTP HEAD request."""
         try:
             import time
+
             start = time.time()
             async with self.session.head(link.url, allow_redirects=True) as response:
                 elapsed = time.time() - start
-                
+
                 if response.status < 400:
                     return LinkResult(
                         link=link,
@@ -450,29 +446,30 @@ class LinkChecker:
                 status=LinkStatus.ERROR,
                 error_message=str(e),
             )
-    
+
     def _check_anchor_link(self, link: Link, doc: MarkdownDocument) -> LinkResult:
         """Check an internal anchor link (#section)."""
         anchor = link.url[1:]  # Remove #
-        
+
         # Get all valid anchors from headings (with variants for different renderers)
         valid_anchors = set()
         primary_anchors = set()  # For suggestions
         from clean_docs.parsers.markdown import MarkdownParser
+
         parser = MarkdownParser()
-        
+
         # Track heading counts for duplicate handling (heading-1, heading-2, etc.)
         heading_counts: Dict[str, int] = {}
-        
+
         for level, text, line in doc.headings:
             # Get primary anchor and all variants
             primary = parser.get_anchor_id(text)
             primary_anchors.add(primary)
-            
+
             # Add all variants
             variants = parser.get_anchor_variants(text)
             valid_anchors.update(variants)
-            
+
             # Handle duplicate headings (GitHub adds -1, -2, etc.)
             if primary in heading_counts:
                 heading_counts[primary] += 1
@@ -483,15 +480,15 @@ class LinkChecker:
                     valid_anchors.add(f"{v}-{heading_counts[primary]}")
             else:
                 heading_counts[primary] = 0
-            
+
             # Also add raw text for exact matches
             valid_anchors.add(text.lower().replace(" ", "-"))
-        
+
         if anchor in valid_anchors:
             return LinkResult(link=link, status=LinkStatus.OK)
-        
+
         # Check if it's a numbered anchor that might match (e.g., #section-2)
-        anchor_match = re.match(r'^(.+)-(\d+)$', anchor)
+        anchor_match = re.match(r"^(.+)-(\d+)$", anchor)
         if anchor_match:
             base_anchor = anchor_match.group(1)
             if base_anchor in valid_anchors or base_anchor in primary_anchors:
@@ -502,32 +499,34 @@ class LinkChecker:
                     error_message=f"Anchor #{anchor} not found (numbered anchor may be outdated)",
                     suggestion=f"Did you mean #{base_anchor}?",
                 )
-        
+
         # Suggest closest match from primary anchors (cleaner suggestions)
         suggestion = self._suggest_anchor(anchor, primary_anchors)
-        
+
         return LinkResult(
             link=link,
             status=LinkStatus.BROKEN,
             error_message=f"Anchor #{anchor} not found",
             suggestion=suggestion,
         )
-    
-    def _check_relative_link(self, link: Link, doc: MarkdownDocument, base_path: Path) -> LinkResult:
+
+    def _check_relative_link(
+        self, link: Link, doc: MarkdownDocument, base_path: Path
+    ) -> LinkResult:
         """Check a relative file link."""
         url = link.url
-        
+
         # Split off anchor
         if "#" in url:
             file_part, anchor = url.split("#", 1)
         else:
             file_part, anchor = url, None
-        
+
         # Resolve path
         doc_dir = doc.path.parent
         target_path = doc_dir / file_part
         target_path = target_path.resolve()
-        
+
         # Check if file exists
         if not target_path.exists():
             # Try with .md extension
@@ -539,35 +538,38 @@ class LinkChecker:
                     link=link,
                     status=LinkStatus.BROKEN,
                     error_message=f"File not found: {file_part}",
-                    suggestion=f"Did you mean {file_part}.md?" if not file_part.endswith(".md") else None,
+                    suggestion=(
+                        f"Did you mean {file_part}.md?" if not file_part.endswith(".md") else None
+                    ),
                 )
-        
+
         # If there's an anchor, check it
         if anchor and target_path.suffix in [".md", ".mdx"]:
             try:
                 from clean_docs.parsers.markdown import MarkdownParser
+
                 parser = MarkdownParser()
                 target_doc = parser.parse_file(target_path)
-                
+
                 valid_anchors = set()
                 primary_anchors = set()
                 heading_counts: Dict[str, int] = {}
-                
+
                 for level, text, line in target_doc.headings:
                     primary = parser.get_anchor_id(text)
                     primary_anchors.add(primary)
-                    
+
                     # Add all variants
                     variants = parser.get_anchor_variants(text)
                     valid_anchors.update(variants)
-                    
+
                     # Handle duplicate headings
                     if primary in heading_counts:
                         heading_counts[primary] += 1
                         valid_anchors.add(f"{primary}-{heading_counts[primary]}")
                     else:
                         heading_counts[primary] = 0
-                
+
                 if anchor not in valid_anchors:
                     return LinkResult(
                         link=link,
@@ -577,22 +579,22 @@ class LinkChecker:
                     )
             except Exception:
                 pass  # If we can't parse, assume the link is OK
-        
+
         return LinkResult(link=link, status=LinkStatus.OK)
-    
+
     def _check_absolute_link(self, link: Link, base_path: Path) -> LinkResult:
         """Check an absolute path link (/docs/foo.md)."""
         url = link.url
-        
+
         # Split off anchor
         if "#" in url:
             file_part, anchor = url.split("#", 1)
         else:
             file_part, _anchor = url, None
-        
+
         # Remove leading slash and resolve from base
         target_path = (base_path / file_part.lstrip("/")).resolve()
-        
+
         if not target_path.exists():
             # Try with .md extension
             md_path = Path(str(target_path) + ".md")
@@ -604,22 +606,23 @@ class LinkChecker:
                     status=LinkStatus.BROKEN,
                     error_message=f"File not found: {file_part}",
                 )
-        
+
         return LinkResult(link=link, status=LinkStatus.OK)
-    
+
     def _suggest_anchor(self, anchor: str, valid_anchors: Set[str]) -> Optional[str]:
         """Suggest a similar anchor name."""
         if not valid_anchors:
             return None
-        
+
         # Simple string similarity
         def similarity(a: str, b: str) -> float:
             from difflib import SequenceMatcher
+
             return SequenceMatcher(None, a.lower(), b.lower()).ratio()
-        
+
         best_match = max(valid_anchors, key=lambda a: similarity(anchor, a))
         score = similarity(anchor, best_match)
-        
+
         if score > 0.5:
             return f"Did you mean #{best_match}?"
         return None

@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 try:
     import tree_sitter_language_pack as ts_langs
     from tree_sitter import Language, Parser, Node
+
     SNIPPETS_AVAILABLE = True
 except ImportError:
     SNIPPETS_AVAILABLE = False
@@ -27,6 +28,7 @@ except ImportError:
 @dataclass
 class Symbol:
     """Represents a symbol extracted from source code."""
+
     name: str
     type: str  # "function", "class", "method", "interface", etc.
     file_path: Path
@@ -45,14 +47,14 @@ LANGUAGE_CONFIG: Dict[str, Dict] = {
             "interface": "(interface_declaration name: (identifier) @name) @interface",
             "method": "(method_declaration name: (identifier) @name) @method",
             "constructor": "(constructor_declaration name: (identifier) @name) @constructor",
-        }
+        },
     },
     "python": {
         "extension": ".py",
         "queries": {
             "class": "(class_definition name: (identifier) @name) @class",
             "function": "(function_definition name: (identifier) @name) @function",
-        }
+        },
     },
     "scala": {
         "extension": ".scala",
@@ -61,7 +63,7 @@ LANGUAGE_CONFIG: Dict[str, Dict] = {
             "object": "(object_definition name: (identifier) @name) @object",
             "trait": "(trait_definition name: (identifier) @name) @trait",
             "function": "(function_definition name: (identifier) @name) @function",
-        }
+        },
     },
     "typescript": {
         "extension": ".ts",
@@ -70,7 +72,7 @@ LANGUAGE_CONFIG: Dict[str, Dict] = {
             "interface": "(interface_declaration name: (type_identifier) @name) @interface",
             "function": "(function_declaration name: (identifier) @name) @function",
             "method": "(method_definition name: (property_identifier) @name) @method",
-        }
+        },
     },
     "javascript": {
         "extension": ".js",
@@ -78,7 +80,7 @@ LANGUAGE_CONFIG: Dict[str, Dict] = {
             "class": "(class_declaration name: (identifier) @name) @class",
             "function": "(function_declaration name: (identifier) @name) @function",
             "method": "(method_definition name: (property_identifier) @name) @method",
-        }
+        },
     },
     "go": {
         "extension": ".go",
@@ -86,7 +88,7 @@ LANGUAGE_CONFIG: Dict[str, Dict] = {
             "function": "(function_declaration name: (identifier) @name) @function",
             "method": "(method_declaration name: (field_identifier) @name) @method",
             "type": "(type_declaration (type_spec name: (type_identifier) @name)) @type",
-        }
+        },
     },
     "rust": {
         "extension": ".rs",
@@ -96,13 +98,13 @@ LANGUAGE_CONFIG: Dict[str, Dict] = {
             "enum": "(enum_item name: (type_identifier) @name) @enum",
             "trait": "(trait_item name: (type_identifier) @name) @trait",
             "impl": "(impl_item type: (type_identifier) @name) @impl",
-        }
+        },
     },
     "starlark": {
         "extension": ".bzl",
         "queries": {
             "function": "(function_definition name: (identifier) @name) @function",
-        }
+        },
     },
 }
 
@@ -195,7 +197,7 @@ class SymbolIndexer:
     ) -> List[Symbol]:
         """Extract symbols from a parsed tree using tree-sitter queries."""
         symbols = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         # Use pattern matching on node types
         LANGUAGE_CONFIG.get(language, {})
@@ -238,7 +240,9 @@ class SymbolIndexer:
         # Scala symbols
         elif language == "scala":
             if node_type in ("class_definition", "trait_definition", "object_definition"):
-                return self._extract_scala_class(node, file_path, lines, node_type.replace("_definition", ""))
+                return self._extract_scala_class(
+                    node, file_path, lines, node_type.replace("_definition", "")
+                )
             elif node_type == "function_definition":
                 return self._extract_scala_function(node, file_path, lines)
 
@@ -265,7 +269,9 @@ class SymbolIndexer:
             if node_type == "function_item":
                 return self._extract_rust_function(node, file_path, lines)
             elif node_type in ("struct_item", "enum_item", "trait_item"):
-                return self._extract_rust_type(node, file_path, lines, node_type.replace("_item", ""))
+                return self._extract_rust_type(
+                    node, file_path, lines, node_type.replace("_item", "")
+                )
 
         # Starlark/Bazel symbols
         elif language == "starlark":
@@ -280,7 +286,7 @@ class SymbolIndexer:
             if child.type in name_types:
                 return child
             # Sometimes name is nested in a field
-            if hasattr(child, 'children'):
+            if hasattr(child, "children"):
                 for grandchild in child.children:
                     if grandchild.type in name_types:
                         return grandchild
@@ -290,7 +296,7 @@ class SymbolIndexer:
         """Get start line, end line, and code for a node."""
         start_line = node.start_point[0] + 1  # 1-indexed
         end_line = node.end_point[0] + 1
-        code = '\n'.join(lines[node.start_point[0]:node.end_point[0] + 1])
+        code = "\n".join(lines[node.start_point[0] : node.end_point[0] + 1])
         return start_line, end_line, code
 
     def _extract_java_class(
@@ -305,8 +311,8 @@ class SymbolIndexer:
         start_line, end_line, code = self._get_code_range(node, lines)
 
         # Get signature (first line usually)
-        signature_end = code.find('{')
-        signature = code[:signature_end].strip() if signature_end > 0 else code.split('\n')[0]
+        signature_end = code.find("{")
+        signature = code[:signature_end].strip() if signature_end > 0 else code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -330,8 +336,8 @@ class SymbolIndexer:
         start_line, end_line, code = self._get_code_range(node, lines)
 
         # Get signature
-        signature_end = code.find('{')
-        signature = code[:signature_end].strip() if signature_end > 0 else code.split('\n')[0]
+        signature_end = code.find("{")
+        signature = code[:signature_end].strip() if signature_end > 0 else code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -353,7 +359,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -375,7 +381,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         # Determine if method or function based on parent
         symbol_type = "function"
@@ -403,7 +409,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -425,7 +431,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -447,7 +453,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -469,7 +475,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -491,7 +497,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -503,9 +509,7 @@ class SymbolIndexer:
             code=code,
         )
 
-    def _extract_go_type(
-        self, node: Node, file_path: Path, lines: List[str]
-    ) -> Optional[Symbol]:
+    def _extract_go_type(self, node: Node, file_path: Path, lines: List[str]) -> Optional[Symbol]:
         """Extract a Go type declaration."""
         # Type declarations contain type_spec children
         for child in node.children:
@@ -514,7 +518,7 @@ class SymbolIndexer:
                 if name_node:
                     name = name_node.text.decode() if name_node.text else ""
                     start_line, end_line, code = self._get_code_range(node, lines)
-                    signature = code.split('\n')[0]
+                    signature = code.split("\n")[0]
 
                     return Symbol(
                         name=name,
@@ -537,7 +541,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -559,7 +563,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -581,7 +585,7 @@ class SymbolIndexer:
 
         name = name_node.text.decode() if name_node.text else ""
         start_line, end_line, code = self._get_code_range(node, lines)
-        signature = code.split('\n')[0]
+        signature = code.split("\n")[0]
 
         return Symbol(
             name=name,
@@ -609,10 +613,26 @@ class SymbolIndexer:
 
         # Directories to skip
         skip_dirs = {
-            "node_modules", ".git", "__pycache__", ".venv", "venv", "env",
-            ".tox", ".pytest_cache", "dist", "build", ".eggs", "site-packages",
-            ".mypy_cache", ".ruff_cache", "target", "bazel-bin", "bazel-out",
-            "bazel-testlogs", ".idea", ".vscode",
+            "node_modules",
+            ".git",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "env",
+            ".tox",
+            ".pytest_cache",
+            "dist",
+            "build",
+            ".eggs",
+            "site-packages",
+            ".mypy_cache",
+            ".ruff_cache",
+            "target",
+            "bazel-bin",
+            "bazel-out",
+            "bazel-testlogs",
+            ".idea",
+            ".vscode",
         }
 
         count = 0
@@ -628,9 +648,7 @@ class SymbolIndexer:
 
         return count
 
-    def find_symbol(
-        self, name: str, symbol_type: Optional[str] = None
-    ) -> List[Symbol]:
+    def find_symbol(self, name: str, symbol_type: Optional[str] = None) -> List[Symbol]:
         """Find symbol by name across indexed files.
 
         Args:

@@ -14,6 +14,7 @@ from clean_docs.symbol_indexer import Symbol, SymbolIndexer
 
 class ValidationStatus(str, Enum):
     """Status of snippet validation."""
+
     VALID = "valid"
     OUTDATED = "outdated"
     NOT_FOUND = "not_found"
@@ -23,6 +24,7 @@ class ValidationStatus(str, Enum):
 @dataclass
 class ValidationResult:
     """Result of validating a code snippet."""
+
     snippet: CodeBlock
     status: ValidationStatus
     source_match: Optional[Symbol] = None
@@ -34,6 +36,7 @@ class ValidationResult:
 @dataclass
 class SnippetReport:
     """Summary report of all snippet validations."""
+
     doc_path: Path
     total_snippets: int
     valid_count: int
@@ -133,7 +136,7 @@ class SnippetValidator:
             return None
 
         # Search indexed files for matching path
-        hint_parts = snippet.file_hint.replace('\\', '/').split('/')
+        hint_parts = snippet.file_hint.replace("\\", "/").split("/")
         hint_filename = hint_parts[-1]
 
         for symbols in self.indexer._symbols.values():
@@ -238,9 +241,7 @@ class SnippetValidator:
 
         return None
 
-    def _best_match_in_file(
-        self, snippet: CodeBlock, symbols: List[Symbol]
-    ) -> Optional[Symbol]:
+    def _best_match_in_file(self, snippet: CodeBlock, symbols: List[Symbol]) -> Optional[Symbol]:
         """Find best matching symbol within a file."""
         best_match: Optional[Symbol] = None
         best_similarity = 0.0
@@ -277,7 +278,7 @@ class SnippetValidator:
     def _normalize_code(self, code: str) -> str:
         """Normalize code for comparison (remove comments, whitespace variations)."""
         lines = []
-        for line in code.strip().split('\n'):
+        for line in code.strip().split("\n"):
             # Remove trailing whitespace
             line = line.rstrip()
             # Skip empty lines
@@ -285,24 +286,24 @@ class SnippetValidator:
                 continue
             # Skip comment-only lines (simple heuristic)
             stripped = line.strip()
-            if stripped.startswith('//') or stripped.startswith('#') or stripped.startswith('*'):
+            if stripped.startswith("//") or stripped.startswith("#") or stripped.startswith("*"):
                 continue
             lines.append(line)
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def compute_diff(self, snippet: CodeBlock, source: Symbol) -> str:
         """Compute unified diff between snippet and actual source."""
-        snippet_lines = snippet.code.strip().split('\n')
-        source_lines = source.code.strip().split('\n')
+        snippet_lines = snippet.code.strip().split("\n")
+        source_lines = source.code.strip().split("\n")
 
         diff = difflib.unified_diff(
             snippet_lines,
             source_lines,
-            fromfile='documentation',
+            fromfile="documentation",
             tofile=str(source.file_path),
-            lineterm='',
+            lineterm="",
         )
-        return '\n'.join(diff)
+        return "\n".join(diff)
 
     def _generate_suggestion(self, snippet: CodeBlock, source: Symbol) -> str:
         """Generate suggested updated code for the snippet.
@@ -314,9 +315,7 @@ class SnippetValidator:
         # Future enhancement: preserve snippet-specific formatting/comments
         return source.code
 
-    def validate_document(
-        self, doc_path: Path, code_blocks: List[CodeBlock]
-    ) -> SnippetReport:
+    def validate_document(self, doc_path: Path, code_blocks: List[CodeBlock]) -> SnippetReport:
         """Validate all code snippets in a document."""
         results = []
         valid_count = 0
@@ -359,7 +358,7 @@ class SnippetValidator:
             Updated document content
         """
         # Find the code block in the document
-        lines = doc_content.split('\n')
+        lines = doc_content.split("\n")
 
         # Find the fence start (snippet.line is 1-indexed)
         fence_start = snippet.line - 1
@@ -369,7 +368,7 @@ class SnippetValidator:
         in_fence = False
         for i in range(fence_start, len(lines)):
             line = lines[i].strip()
-            if line.startswith('```'):
+            if line.startswith("```"):
                 if not in_fence:
                     in_fence = True
                 else:
@@ -385,12 +384,12 @@ class SnippetValidator:
         new_block = [
             fence_line,  # Opening fence with language
             suggestion.rstrip(),
-            '```',
+            "```",
         ]
 
         # Replace the block
-        new_lines = lines[:fence_start] + new_block + lines[fence_end + 1:]
-        return '\n'.join(new_lines)
+        new_lines = lines[:fence_start] + new_block + lines[fence_end + 1 :]
+        return "\n".join(new_lines)
 
     def fix_document(
         self, doc_path: Path, report: SnippetReport, dry_run: bool = False

@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 # Optional dependencies
 try:
     import sqlite_vec
+
     VECTOR_DB_AVAILABLE = True
 except ImportError:
     sqlite_vec = None
@@ -26,6 +27,7 @@ except ImportError:
 
 try:
     import numpy as np
+
     NUMPY_AVAILABLE = True
 except ImportError:
     np = None
@@ -35,6 +37,7 @@ except ImportError:
 @dataclass
 class VectorEntry:
     """Represents a stored vector with metadata."""
+
     id: str
     vector: Any  # numpy array or list of floats
     metadata: Dict[str, Any]
@@ -43,13 +46,13 @@ class VectorEntry:
 
 def serialize_float32(vector: List[float]) -> bytes:
     """Serialize a float32 vector to bytes for sqlite-vec."""
-    return struct.pack(f'{len(vector)}f', *vector)
+    return struct.pack(f"{len(vector)}f", *vector)
 
 
 def deserialize_float32(data: bytes) -> List[float]:
     """Deserialize bytes to a float32 vector."""
     n = len(data) // 4
-    return list(struct.unpack(f'{n}f', data))
+    return list(struct.unpack(f"{n}f", data))
 
 
 class VectorStore:
@@ -80,7 +83,7 @@ class VectorStore:
 
     def _get_conn(self) -> sqlite3.Connection:
         """Get thread-local database connection."""
-        if not hasattr(self._local, 'conn') or self._local.conn is None:
+        if not hasattr(self._local, "conn") or self._local.conn is None:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(
                 self.db_path,
@@ -158,7 +161,7 @@ class VectorStore:
         cursor = conn.cursor()
 
         # Convert to list if numpy array
-        if NUMPY_AVAILABLE and hasattr(vector, 'tolist'):
+        if NUMPY_AVAILABLE and hasattr(vector, "tolist"):
             vector_list = vector.tolist()
         else:
             vector_list = list(vector)
@@ -170,18 +173,18 @@ class VectorStore:
             # sqlite-vec format
             cursor.execute(
                 "INSERT OR REPLACE INTO vectors (id, embedding) VALUES (?, ?)",
-                (id, serialize_float32(vector_list))
+                (id, serialize_float32(vector_list)),
             )
             cursor.execute(
                 "INSERT OR REPLACE INTO vector_metadata (id, metadata, timestamp) VALUES (?, ?, ?)",
-                (id, metadata_json, timestamp)
+                (id, metadata_json, timestamp),
             )
         else:
             # Fallback: store as blob
             vector_blob = serialize_float32(vector_list)
             cursor.execute(
                 "INSERT OR REPLACE INTO vectors (id, embedding, metadata, timestamp) VALUES (?, ?, ?, ?)",
-                (id, vector_blob, metadata_json, timestamp)
+                (id, vector_blob, metadata_json, timestamp),
             )
 
         conn.commit()
@@ -205,7 +208,7 @@ class VectorStore:
         cursor.execute("BEGIN")
         try:
             for id, vector, metadata in entries:
-                if NUMPY_AVAILABLE and hasattr(vector, 'tolist'):
+                if NUMPY_AVAILABLE and hasattr(vector, "tolist"):
                     vector_list = vector.tolist()
                 else:
                     vector_list = list(vector)
@@ -215,17 +218,17 @@ class VectorStore:
                 if self.use_vec_extension:
                     cursor.execute(
                         "INSERT OR REPLACE INTO vectors (id, embedding) VALUES (?, ?)",
-                        (id, serialize_float32(vector_list))
+                        (id, serialize_float32(vector_list)),
                     )
                     cursor.execute(
                         "INSERT OR REPLACE INTO vector_metadata (id, metadata, timestamp) VALUES (?, ?, ?)",
-                        (id, metadata_json, timestamp)
+                        (id, metadata_json, timestamp),
                     )
                 else:
                     vector_blob = serialize_float32(vector_list)
                     cursor.execute(
                         "INSERT OR REPLACE INTO vectors (id, embedding, metadata, timestamp) VALUES (?, ?, ?, ?)",
-                        (id, vector_blob, metadata_json, timestamp)
+                        (id, vector_blob, metadata_json, timestamp),
                     )
 
             cursor.execute("COMMIT")
@@ -252,14 +255,15 @@ class VectorStore:
         conn = self._get_conn()
         cursor = conn.cursor()
 
-        if NUMPY_AVAILABLE and hasattr(query_vector, 'tolist'):
+        if NUMPY_AVAILABLE and hasattr(query_vector, "tolist"):
             query_list = query_vector.tolist()
         else:
             query_list = list(query_vector)
 
         if self.use_vec_extension:
             # Use sqlite-vec for efficient search
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     v.id,
                     v.distance,
@@ -269,18 +273,20 @@ class VectorStore:
                 WHERE v.embedding MATCH ?
                     AND k = ?
                 ORDER BY v.distance
-            """, (serialize_float32(query_list), top_k))
+            """,
+                (serialize_float32(query_list), top_k),
+            )
 
             results = []
             for row in cursor.fetchall():
                 # sqlite-vec returns L2 distance, convert to similarity
                 # For normalized vectors: similarity = 1 - distance/2
-                distance = row['distance']
+                distance = row["distance"]
                 similarity = max(0, 1 - distance / 2)
 
                 if similarity >= threshold:
-                    metadata = json.loads(row['metadata']) if row['metadata'] else {}
-                    results.append((row['id'], similarity, metadata))
+                    metadata = json.loads(row["metadata"]) if row["metadata"] else {}
+                    results.append((row["id"], similarity, metadata))
 
             return results
 
@@ -302,12 +308,12 @@ class VectorStore:
 
         results = []
         for row in cursor.fetchall():
-            stored_vector = deserialize_float32(row['embedding'])
+            stored_vector = deserialize_float32(row["embedding"])
             similarity = self._cosine_similarity(query_list, stored_vector)
 
             if similarity >= threshold:
-                metadata = json.loads(row['metadata']) if row['metadata'] else {}
-                results.append((row['id'], similarity, metadata))
+                metadata = json.loads(row["metadata"]) if row["metadata"] else {}
+                results.append((row["id"], similarity, metadata))
 
         # Sort by similarity descending
         results.sort(key=lambda x: x[1], reverse=True)
@@ -346,30 +352,30 @@ class VectorStore:
         cursor = conn.cursor()
 
         if self.use_vec_extension:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT v.embedding, m.metadata, m.timestamp
                 FROM vectors v
                 JOIN vector_metadata m ON v.id = m.id
                 WHERE v.id = ?
-            """, (id,))
-        else:
-            cursor.execute(
-                "SELECT embedding, metadata, timestamp FROM vectors WHERE id = ?",
-                (id,)
+            """,
+                (id,),
             )
+        else:
+            cursor.execute("SELECT embedding, metadata, timestamp FROM vectors WHERE id = ?", (id,))
 
         row = cursor.fetchone()
         if row is None:
             return None
 
-        vector = deserialize_float32(row['embedding'])
-        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        vector = deserialize_float32(row["embedding"])
+        metadata = json.loads(row["metadata"]) if row["metadata"] else {}
 
         return VectorEntry(
             id=id,
             vector=vector,
             metadata=metadata,
-            timestamp=row['timestamp'],
+            timestamp=row["timestamp"],
         )
 
     def delete(self, id: str) -> bool:
@@ -416,11 +422,11 @@ class VectorStore:
         else:
             cursor.execute("SELECT COUNT(*) as cnt FROM vectors")
 
-        return cursor.fetchone()['cnt']
+        return cursor.fetchone()["cnt"]
 
     def close(self) -> None:
         """Close the database connection."""
-        if hasattr(self._local, 'conn') and self._local.conn is not None:
+        if hasattr(self._local, "conn") and self._local.conn is not None:
             self._local.conn.close()
             self._local.conn = None
 
@@ -502,16 +508,18 @@ class CodeVectorStore(VectorStore):
             if symbol_type and metadata.get("type") != symbol_type:
                 continue
 
-            matches.append({
-                "id": id,
-                "similarity": similarity,
-                "name": metadata.get("name"),
-                "file_path": metadata.get("file_path"),
-                "start_line": metadata.get("start_line"),
-                "end_line": metadata.get("end_line"),
-                "code": metadata.get("code"),
-                "type": metadata.get("type"),
-            })
+            matches.append(
+                {
+                    "id": id,
+                    "similarity": similarity,
+                    "name": metadata.get("name"),
+                    "file_path": metadata.get("file_path"),
+                    "start_line": metadata.get("start_line"),
+                    "end_line": metadata.get("end_line"),
+                    "code": metadata.get("code"),
+                    "type": metadata.get("type"),
+                }
+            )
 
             if len(matches) >= top_k:
                 break

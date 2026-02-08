@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include pyproject.toml
+include MANIFEST.in
+recursive-include clean_docs *.py
+recursive-include clean_docs py.typed
+prune tests
+prune docs
+prune .github
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store

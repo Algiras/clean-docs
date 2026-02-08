@@ -64,9 +64,11 @@ vectors = [
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
+    "pre-commit>=3.5.0",
 ]
 
 [project.scripts]
@@ -78,6 +80,16 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["clean_docs"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "clean_docs/**/*.py",
+    "clean_docs/py.typed",
+    "tests/**/*.py",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
 
 [tool.black]
 line-length = 100

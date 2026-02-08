@@ -34,15 +34,16 @@ jobs:
     
     - name: Run type checking
       run: |
-        mypy clean_docs/ --ignore-missing-imports || true
-    
+        mypy clean_docs/ --ignore-missing-imports
+      continue-on-error: true
+
     - name: Run linting
       run: |
-        ruff check clean_docs/ || true
-    
+        ruff check clean_docs/
+
     - name: Check formatting
       run: |
-        black --check clean_docs/ || true
+        black --check clean_docs/
 
   test-snippets:
     runs-on: ubuntu-latest
@@ -94,23 +95,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    
+
     - name: Install dependencies
       run: |
         pip install -e ".[dev]"
         pip install pytest-cov
-    
+
     - name: Run tests with coverage
       run: |
         pytest tests/ --cov=clean_docs --cov-report=xml --cov-report=term
-    
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
+
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build package
+      run: python -m build
+
+    - name: Check package
+      run: twine check dist/*
+
+    - name: Install package
+      run: |
+        pip install dist/*.whl
+        clean-docs --version

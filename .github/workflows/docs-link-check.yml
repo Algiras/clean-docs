@@ -28,13 +28,17 @@ jobs:
       run: |
         pip install -e .
     
+    - name: Run doctor (informational only)
+      run: |
+        clean-docs doctor
+      continue-on-error: true
+
     - name: Check documentation links
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        clean-docs doctor || true  # Doctor is informational only
         # Exclude test directories which have intentional broken links
-        clean-docs scan . --internal-only --exclude "test_docs/*" --exclude "test_src/*" --format json > link-check-results.json || true
+        clean-docs scan . --internal-only --exclude "test_docs/*" --exclude "test_src/*" --format json > link-check-results.json
     
     - name: Upload results
       uses: actions/upload-artifact@v4

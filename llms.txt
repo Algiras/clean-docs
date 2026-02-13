@@ -1,0 +1,37 @@
+# Clean Docs - Documentation Quality Validator
+
+## Overview
+A Python CLI tool for validating documentation quality. Checks code snippets against source code, detects broken links, auto-fixes issues, and integrates seamlessly with CI/CD pipelines.
+
+## Key Features
+- Code snippet validation using tree-sitter
+- Broken link detection
+- Auto-fix capabilities
+- CI/CD integration (GitHub Actions, GitLab CI)
+- Multi-format support (Markdown, HTML, RST)
+- Batch processing
+
+## Documentation
+https://algiras.github.io/clean-docs/
+
+## Repository
+https://github.com/Algiras/clean-docs
+
+## Installation
+Available on PyPI: `pip install clean-docs`
+
+## Use Cases
+- Maintaining documentation accuracy
+- Preventing outdated code examples
+- Automated documentation validation
+- Quality gates in CI/CD
+- Documentation consistency checks
+
+## Technologies
+- Python 3.10+
+- Tree-sitter parsing
+- GitHub Actions integration
+- Available as Claude Code skill
+
+## License
+MIT

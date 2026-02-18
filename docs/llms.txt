@@ -1,0 +1,42 @@
+# Clean Docs
+
+> CLI tool for documentation quality — validate code snippets, detect broken links, auto-fix issues, and integrate with CI/CD.
+
+## About
+
+Clean Docs is a Python CLI that ensures your documentation stays accurate and functional. It validates code examples against actual source files using tree-sitter, checks links, auto-fixes common issues, and integrates with CI/CD pipelines via JSON/Markdown output and GitHub annotations.
+
+## Install
+
+```bash
+pip install clean-docs                        # Core features
+pip install 'clean-docs[snippets]'            # + Code snippet validation
+pip install 'clean-docs[semantic]'            # + AI-powered analysis
+pip install 'clean-docs[snippets,semantic]'   # All features
+```
+
+PyPI: https://pypi.org/project/clean-docs/
+
+## Core Commands
+
+- `clean-docs doctor` - Check setup and configuration
+- `clean-docs scan ./docs` - Scan for broken links
+- `clean-docs validate-snippets ./docs --code-dir ./src` - Validate code examples
+- `clean-docs fix ./docs` - Auto-fix detected issues
+
+## Features
+
+- **Code snippet validation**: tree-sitter parsing, checks examples against real source
+- **Link checking**: internal files, external URLs, GitHub repos, anchors
+- **Auto-fixing**: outdated snippets, missing extensions, anchor typos, case issues
+- **Smart caching**: SQLite-based with 24h TTL
+- **CODEOWNERS support**: group issues by team, create PRs per owner
+- **CI/CD ready**: JSON/Markdown output, GitHub annotations, exit codes
+
+## Source
+
+- Repository: https://github.com/Algiras/clean-docs
+- Documentation: https://algiras.github.io/clean-docs/
+- PyPI: https://pypi.org/project/clean-docs/
+- License: MIT
+- Language: Python
